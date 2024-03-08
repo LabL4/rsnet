@@ -15,16 +15,19 @@ impl Context {
     pub async fn init<'a>(surface: &mut SurfaceWrapper<'a>, window: Arc<Window>) -> Self {
         info!("Initializing wgpu...");
 
+        // let backends = wgpu::Backends::GL;
         let backends = wgpu::util::backend_bits_from_env().unwrap_or(wgpu::Backends::all());
         let dx12_shader_compiler = wgpu::util::dx12_shader_compiler_from_env().unwrap_or_default();
         let gles_minor_version = wgpu::util::gles_minor_version_from_env().unwrap_or_default();
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends,
-            flags: wgpu::InstanceFlags::from_build_config().with_env(),
+            flags: wgpu::InstanceFlags::from_build_config().with_env(),// | wgpu::InstanceFlags::debugging(),
             dx12_shader_compiler,
             gles_minor_version,
         });
+
+        // let instance = wgpu::Instance::new(wgpu::BackendBit::GL);
 
         surface.pre_adapter(&instance, window);
 

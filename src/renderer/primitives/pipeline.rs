@@ -7,11 +7,11 @@ use wgpu::{util::DeviceExt, Device, SurfaceConfiguration};
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 pub struct Vertex {
     // pub component_idx: u32,
-    pub fragment_idx: u32,
+    pub fragments_idx: u32,
 }
 
 impl Vertex {
-    fn desc() -> wgpu::VertexBufferLayout<'static> {
+    pub fn desc() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
@@ -32,32 +32,75 @@ impl Vertex {
 }
 
 pub struct VertexBuffer<'a> {
-    pub buffer: wgpu::Buffer,
+    pub value: Vec<Vertex>,
+    pub label: Option<String>,
+    // pub scratch: Option<Vec<Vertex>>,
+    pub buffer: Option<wgpu::Buffer>,
     pub buffer_layout: wgpu::VertexBufferLayout<'a>
 }
 
-pub fn attach_vertex_buffer<'a>(device: &Device, mut vertex_data: Option<Vec<Vertex>>) -> VertexBuffer<'a> {
+impl VertexBuffer<'_> {
 
-    if vertex_data.is_none() {
-        vertex_data = Some(vec![Vertex {
-            // component_idx: 0,
-            fragment_idx: 0
-        }]);
+    pub fn get(&self) -> &Vec<Vertex> {
+        &self.value
     }
 
-    let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Vertex buffer"),
-        contents: bytemuck::cast_slice(vertex_data.unwrap().as_slice()),
-        usage: wgpu::BufferUsages::VERTEX,
-    });
+    pub fn set(&mut self, value: Vec<Vertex>) {
+        self.value = value;
+    }
 
-    let buffer_layout = Vertex::desc();
+    pub fn set_label(&mut self, label: Option<String>) {
+        self.label = label;
+    }
 
-    VertexBuffer {
-        buffer,
-        buffer_layout
+    pub fn buffer(&self) -> Option<&wgpu::Buffer> {
+        self.buffer.as_ref()
+    }
+
+    pub fn buffer_layout(&self) -> &wgpu::VertexBufferLayout {
+        &self.buffer_layout
+    }
+
+    pub fn write(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
+
+        let capacity: u64 = self.buffer.as_ref().map(wgpu::Buffer::size).unwrap_or(0);
+        let byte_data = bytemuck::cast_slice(self.value.as_slice());
+
+        if capacity < byte_data.len() as u64 {
+            self.buffer = Some(device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: self.label.as_deref(),
+                contents: byte_data,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            }));
+        } else {
+            queue.write_buffer(self.buffer.as_ref().unwrap(), 0, byte_data);
+        }
+
     }
 }
+
+// pub fn attach_vertex_buffer<'a>(device: &Device, mut vertex_data: Option<Vec<Vertex>>) -> VertexBuffer<'a> {
+
+//     if vertex_data.is_none() {
+//         vertex_data = Some(vec![Vertex {
+//             // component_idx: 0,
+//             fragments_idx: 0
+//         }]);
+//     }
+
+//     let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+//         label: Some("Vertex buffer"),
+//         contents: bytemuck::cast_slice(vertex_data.unwrap().as_slice()),
+//         usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+//     });
+
+//     let buffer_layout = Vertex::desc();
+
+//     VertexBuffer {
+//         buffer,
+//         buffer_layout
+//     }
+// }
 
 pub fn create_primitive_pipeline(
     config: &SurfaceConfiguration,
@@ -67,6 +110,7 @@ pub fn create_primitive_pipeline(
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("Main shader"),
         source: wgpu::ShaderSource::Wgsl(include_str!(shader_path!("primitives/primitive.wgsl")).into()),
+
     });
 
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -93,16 +137,16 @@ pub fn create_primitive_pipeline(
             entry_point: "fs_main",
             targets: &[Some(wgpu::ColorTargetState {
                 format: color_format,
-                blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                blend: Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING),
                 write_mask: wgpu::ColorWrites::ALL,
             })],
         }),
         primitive: wgpu::PrimitiveState {
-            topology: wgpu::PrimitiveTopology::TriangleStrip,
+            topology: wgpu::PrimitiveTopology::TriangleList,
             strip_index_format: None,
             front_face: wgpu::FrontFace::Cw,
-            cull_mode: Some(wgpu::Face::Back),
-            // cull_mode: None,
+            // cull_mode: Some(wgpu::Face::Back),
+            cull_mode: None,
             // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
             polygon_mode: wgpu::PolygonMode::Fill,
             // Requires Features::DEPTH_CLIP_CONTROL
@@ -117,6 +161,22 @@ pub fn create_primitive_pipeline(
             stencil: wgpu::StencilState::default(),
             bias: wgpu::DepthBiasState::default(),
         }),
+        // depth_stencil: Some(wgpu::DepthStencilState {
+        //     format: wgpu::TextureFormat::Depth32Float,
+        //     depth_write_enabled: true,
+        //     depth_compare: wgpu::CompareFunction::Less,
+        //     stencil: wgpu::StencilState {
+        //         front: wgpu::StencilFaceState::IGNORE,
+        //         back: wgpu::StencilFaceState::IGNORE,
+        //         read_mask: 0,
+        //         write_mask: 0,
+        //     },
+        //     bias: wgpu::DepthBiasState {
+        //         constant: 0,
+        //         slope_scale: 0.0,
+        //         clamp: 0.0,
+        //     },
+        // }),
         multisample: wgpu::MultisampleState {
             count: 1,
             mask: !0,

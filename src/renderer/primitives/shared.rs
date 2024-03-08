@@ -1,9 +1,9 @@
 use nalgebra::Vector2;
 use encase::ShaderType;
 
-use crate::renderer::StorageBufferData;
+use crate::renderer::{StorageBufferData, UniformBufferData};
 
-const MAX_FRAGMENTS: usize = 10;
+pub const MAX_FRAGMENTS: usize = 15;
 
 #[derive(Debug, Clone, Copy, Default, ShaderType)]
 pub struct CircleFragment {
@@ -43,6 +43,17 @@ pub struct Fragments {
 
 pub struct FragmentsStorage {
     pub fragments: StorageBufferData<Vec<Fragments>>,
+    pub bind_group: wgpu::BindGroup,
+    pub bind_group_layout: wgpu::BindGroupLayout
+}
+
+#[derive(Debug, ShaderType)]
+pub struct FragmentsData {
+    pub fragments_idx: u32
+}
+
+pub struct FragmentsDataUniform {
+    pub fragments_data: UniformBufferData<FragmentsData>,
     pub bind_group: wgpu::BindGroup,
     pub bind_group_layout: wgpu::BindGroupLayout
 }

@@ -37,15 +37,19 @@ impl Scene {
 
         /// Add 10M components to the scene
         /// 
+        // let n_cols = 2;
+        // let n_rows = 2;
+
         let n_cols = 1000;
         let n_rows = 1000;
         
         for i in 0..n_rows {
             for j in 0..n_cols {
-                let spacing = 5.0;
+                let spacing = 2.0;
                 let pos = Vector2::new(i as f32, j as f32) * spacing;
+                let id = j+1 + i*n_cols;
                 // info!("Adding component with id {}", j + i*n_cols);
-                scene.add_component(Component::new(j + i*n_cols, 0, pos, 0.0, 0));
+                scene.add_component(Component::new(id, 0, pos, (id % 3) as f32  , id%2));
             }
         } 
 

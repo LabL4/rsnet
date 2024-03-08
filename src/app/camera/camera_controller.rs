@@ -204,6 +204,10 @@ impl CameraController {
         }
     }
 
+    pub fn radius(&self) -> f32 {
+        self.radius
+    }
+
     pub fn get_camera(&self) -> &Camera {
         &self.camera
     }

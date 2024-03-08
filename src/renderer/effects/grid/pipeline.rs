@@ -24,7 +24,7 @@ pub fn create_pipeline(
 
     let vertex_layouts = &[];
     let color_format = config.format;
-    let depth_format = None;
+    // let depth_format = None;
 
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some("Grid effect render pipeline"),
@@ -39,7 +39,7 @@ pub fn create_pipeline(
             entry_point: "fs_main",
             targets: &[Some(wgpu::ColorTargetState {
                 format: color_format,
-                blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                blend: Some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING),
                 write_mask: wgpu::ColorWrites::ALL,
             })],
         }),
@@ -56,13 +56,7 @@ pub fn create_pipeline(
             // Requires Features::CONSERVATIVE_RASTERIZATION
             conservative: false,
         },
-        depth_stencil: depth_format.map(|format| wgpu::DepthStencilState {
-            format,
-            depth_write_enabled: true,
-            depth_compare: wgpu::CompareFunction::Less,
-            stencil: wgpu::StencilState::default(),
-            bias: wgpu::DepthBiasState::default(),
-        }),
+        depth_stencil: None,
         multisample: wgpu::MultisampleState {
             count: 1,
             mask: !0,

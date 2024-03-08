@@ -20,7 +20,7 @@ struct WindowUniform {
     aspect: f32,
 }
 
-const MAX_FRAGMENTS = 15;
+const MAX_FRAGMENTS = 50;
 
 @group(0) @binding(0)
 var<uniform> camera: CameraUniform;
@@ -41,6 +41,10 @@ struct FragmentsData {
 
 @group(3) @binding(0)
 var<uniform> fragments_data: FragmentsData;
+
+
+// @group(3) @binding(0)
+// var<storage, write> frag_output: texture_2d<vec4<f32>, write>;
 
 struct Fragments {
     circles: array<CircleFragment, MAX_FRAGMENTS>,
@@ -179,13 +183,11 @@ fn vs_line(vertex_idx: u32, fragment: LineFragment, prev_fragment: LineFragment,
     let normal_with_dir = (selected_normal * up_bit_f32 - selected_normal * (1.0 - up_bit_f32)) * fragment.thickness / 2.0;
 
 
-    let vertex_model = ((1.0 - right_bit_f32) * fragment.start
+    let vertex_world = ((1.0 - right_bit_f32) * fragment.start
                      + (right_bit_f32) * fragment.end) + normal_with_dir;
 
-    output.clip_pos = vec4<f32>(vertex_model, 0.0, 1.0);
-    // output.clip_pos = vec4<f32>(vertex.x, vertex.y, 0.0, 1.0);
+    output.clip_pos = vec4<f32>(vertex_world, 0.0, 1.0);
     output.color = rgb_from_u32(fragment.color);
-    // output.color = vec4<f32>(0.0, 0.0, 0.0, 1.0);
     
     return output;
 }
@@ -198,9 +200,7 @@ fn vs_rectangle(vertex_idx: u32, fragment: RectangleFragment) -> VertexOutput {
         (f32(vertex_idx & 1u) - 0.5) * 2.0
     );
     
-    // output.clip_pos = vec4<f32>(vertex.x , vertex.y, 0.0, 1.0) + vec4<f32>(fragment.center, 0.0, 0.0);
     output.clip_pos = vec4<f32>(vertex.x * fragment.size.x / 2.0, vertex.y * fragment.size.y / 2.0, 0.0, 1.0) + vec4<f32>(fragment.center, 0.0, 0.0);
-
     output.color = rgb_from_u32(fragment.color);
     output.tex_coords = vertex;
 
@@ -210,8 +210,8 @@ fn vs_rectangle(vertex_idx: u32, fragment: RectangleFragment) -> VertexOutput {
 
 @vertex
 fn vs_main(
-    // @location(0) component_idx: u32,
     // @location(0) fragments_idx: u32,
+    // @location(1) fragment_idx: u32,
     @builtin(vertex_index) vertex_idx: u32,
     @builtin(instance_index) instance_index: u32,
 ) -> VertexOutput {
@@ -222,44 +222,36 @@ fn vs_main(
     var output: VertexOutput;
 
     let component = components[component_idx];
+    // var fragments = component_fragments[component.ty];
     var fragments = component_fragments[fragments_data.fragments_idx];
-    let vertex_idx_in_fragment = vertex_idx % 6 - (vertex_idx % 6) / 3u * 2u;
+    var vertex_idx_in_fragment = vertex_idx % 6;
+    vertex_idx_in_fragment = vertex_idx_in_fragment - vertex_idx_in_fragment / 3u * 2u;
 
-    var idx = 0u;
-    if (fragment_idx >= fragments.n_circles && fragment_idx < fragments.n_circles + fragments.n_lines) {
-        idx = 1u;
-    } else if (fragment_idx >= fragments.n_circles + fragments.n_lines) {
-        idx = 2u;
+    if (fragment_idx < fragments.n_circles) {
+        var fragment = fragments.circles[fragment_idx];
+        output = vs_circle(vertex_idx_in_fragment, fragment);
+        output.fragment_ty = 0u;
+    } else if (fragment_idx < fragments.n_circles + fragments.n_lines) {
+        let idx = fragment_idx - fragments.n_circles;
+        let prev_idx = u32(max(0i, i32(idx) - 1i));
+        let next_idx = min(fragments.n_lines - 1u, idx + 1u);
+
+        var fragment = fragments.lines[idx];
+        var prev_fragment = fragments.lines[prev_idx];
+        var next_fragment = fragments.lines[next_idx];
+        
+
+        output = vs_line(vertex_idx_in_fragment, fragment, prev_fragment, next_fragment);
+        output.fragment_ty = 1u;
+    
+    } else {
+        var fragment = fragments.rectangles[fragment_idx - fragments.n_circles - fragments.n_lines];
+        output = vs_rectangle(vertex_idx_in_fragment, fragment);
+        output.fragment_ty = 2u;
     }
 
-    switch idx {
-        case 2u: {
-            var fragment = fragments.rectangles[fragment_idx - fragments.n_circles - fragments.n_lines];
-            output = vs_rectangle(vertex_idx_in_fragment, fragment);
-            output.fragment_ty = 2u;
-        }
-        case 1u: {
-            let idx = fragment_idx - fragments.n_circles;
-            let prev_idx = u32(max(0i, i32(idx) - 1i));
-            let next_idx = min(fragments.n_lines - 1u, idx + 1u);
-
-            var fragment = fragments.lines[idx];
-            var prev_fragment = fragments.lines[prev_idx];
-            var next_fragment = fragments.lines[next_idx];
-
-            output = vs_line(vertex_idx_in_fragment, fragment, prev_fragment, next_fragment);
-            output.fragment_ty = 1u;
-        }
-        case 0u, default {
-            var fragment = fragments.circles[fragment_idx];
-            output = vs_circle(vertex_idx_in_fragment, fragment);
-            output.fragment_ty = 0u;
-        }
-    }
-
-    output.clip_pos = camera.view_proj * mat3_to_mat4(component.model) * output.clip_pos;
+    output.clip_pos = camera.view_proj * vec4<f32>((component.model * vec3<f32>(output.clip_pos.xy, 1.0)).xy, 0.0, 1.0);
     output.component_idx = component_idx;
-
 
     return output;
 }
@@ -292,6 +284,14 @@ fn fs_rectangle(in: VertexOutput) -> FragmentOutput {
     var output: FragmentOutput;
 
     output.color = in.color;
+    // let dist = length(in.tex_coords);
+    // Wireframe
+    // if (dist > 0.9) {
+    //     output.color = in.color;
+    // } else {
+    //     discard;
+    // }
+
 
     return output;
 }

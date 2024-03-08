@@ -3,11 +3,13 @@ pub mod shared;
 pub mod utils;
 pub mod common; // Common set of primitives (Memristor, Resistor, etc)
 
+use std::char::MAX;
+
 use nalgebra::Vector2;
 use encase::ShaderType;
 use tracing::info;
 
-use self::shared::{CircleFragment, Fragments, LineFragment, RectangleFragment};
+use self::shared::{CircleFragment, Fragments, LineFragment, RectangleFragment, MAX_FRAGMENTS};
 
 #[derive(Debug)]
 pub struct Primitives {
@@ -18,13 +20,13 @@ pub struct Primitives {
 
 impl Primitives {
     pub fn to_fragments(&self) -> Fragments {
-        let mut circles = [CircleFragment::default(); 10];
+        let mut circles = [CircleFragment::default(); MAX_FRAGMENTS];
         let mut n_circles = 0;
     
-        let mut lines = [LineFragment::default(); 10];
+        let mut lines = [LineFragment::default(); MAX_FRAGMENTS];
         let mut n_lines = 0;
     
-        let mut rectangles = [RectangleFragment::default(); 10];
+        let mut rectangles = [RectangleFragment::default(); MAX_FRAGMENTS];
         let mut n_rectangles = 0;
     
         for circle in &self.circles {
@@ -42,6 +44,8 @@ impl Primitives {
                 n_lines += 1;
             }
         }
+
+        // info!("Line fragments!!!: {:?}", lines[0..n_lines].to_vec());
     
         for rectangle in &self.rectangles {
             let rectangle_fragments = rectangle.to_fragments();
@@ -119,7 +123,7 @@ impl LinePrimitive {
             });
         }
 
-        info!("Line fragments: {:?}", fragments);
+        // info!("Line fragments: {:?}", fragments);
 
         fragments
     }

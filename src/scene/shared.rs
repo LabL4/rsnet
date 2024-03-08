@@ -8,7 +8,7 @@ use tracing::info;
 
 
 /// This will be the buffer that holds all the components for the entities
-#[derive(ShaderType, Debug)]
+#[derive(ShaderType, Debug, Default, Clone)]
 pub struct ComponentBufferEntry {
     pub model: Matrix3<f32>,
     pub id: u32,
