@@ -3,11 +3,7 @@ pub mod shared;
 pub mod utils;
 pub mod common; // Common set of primitives (Memristor, Resistor, etc)
 
-use std::char::MAX;
-
 use nalgebra::Vector2;
-use encase::ShaderType;
-use tracing::info;
 
 use self::shared::{CircleFragment, Fragments, LineFragment, RectangleFragment, MAX_FRAGMENTS};
 

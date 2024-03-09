@@ -3,7 +3,6 @@ use super::App;
 use crate::gui::renderer::GuiRenderer;
 use crate::renderer::Renderer;
 use crate::utils::frame_counter::FrameCounter;
-use crate::utils::wgpu::surface;
 use crate::utils::wgpu::{context::Context, surface::SurfaceWrapper};
 
 use std::sync::Arc;
@@ -62,7 +61,7 @@ pub async fn run() {
     }
 
     let window_loop = EventLoopWrapper::new("rsnet");
-    let initial_w_size = window_loop.get_window().inner_size();
+    // let initial_w_size = window_loop.get_window().inner_size();
     let mut surface = SurfaceWrapper::new();
     let context = Context::init(&mut surface, window_loop.window.clone()).await;
 
@@ -78,7 +77,7 @@ pub async fn run() {
     let _ = (event_loop_function)(window_loop.event_loop, event_handler(window_loop.window, surface, context));
 }
 
-fn event_handler<'a>(window: Arc<Window>, mut surface: SurfaceWrapper<'a>, context: Context) -> impl FnMut(Event<()>, &EventLoopWindowTarget<()>) -> () + 'a
+fn event_handler<'a>(window: Arc<Window>, surface: SurfaceWrapper<'a>, context: Context) -> impl FnMut(Event<()>, &EventLoopWindowTarget<()>) -> () + 'a
 {
     
     let mut frame_counter = FrameCounter::new();

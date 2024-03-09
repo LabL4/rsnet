@@ -3,7 +3,6 @@ pub mod utils;
 pub mod shared;
 
 use nalgebra::Vector2;
-use tracing::info;
 use utils::*;
 use component::Component;
 
@@ -35,13 +34,12 @@ impl Scene {
             chunk_size: 10.0
         };
 
-        /// Add 10M components to the scene
-        /// 
-        // let n_cols = 2;
-        // let n_rows = 2;
-
+        // Add 10M components to the scene
         let n_cols = 1000;
         let n_rows = 1000;
+
+        // let n_cols = 1000;
+        // let n_rows = 1000;
         
         for i in 0..n_rows {
             for j in 0..n_cols {

@@ -1,13 +1,12 @@
-use std::primitive;
+use super::super::utils::{storage_as_wgsl_bytes, StorageBufferData};
+use super::shared::*;
+
+use crate::renderer::{uniform_as_wgsl_bytes, UniformBufferData};
 
 use wgpu::util::DeviceExt;
 use wgpu::{BindGroup, BindGroupLayout, Buffer, Device};
 
-use crate::renderer::{uniform_as_wgsl_bytes, UniformBufferData};
 
-use super::super::utils::{storage_as_wgsl_bytes, StorageBufferData};
-use super::shared::*;
-use super::Primitives;
 
 pub fn attach_empty_fragment_storage(device: &Device) -> FragmentsStorage {
     let mut fragments = StorageBufferData::empty(Vec::new());
@@ -46,7 +45,7 @@ pub fn attach_empty_fragment_storage(device: &Device) -> FragmentsStorage {
 }
 
 pub fn attach_fragment_data_uniform(device: &Device) -> FragmentsDataUniform {
-    let mut fragments_data = FragmentsData {
+    let fragments_data = FragmentsData {
         fragments_idx: 0
     };
 

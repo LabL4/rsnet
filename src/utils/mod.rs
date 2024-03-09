@@ -3,7 +3,7 @@ pub mod wgpu;
 
 use nalgebra::Vector2;
 use rayon::prelude::*;
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug};
 
 pub type WindowSize = winit::dpi::PhysicalSize<u32>;
 pub type Id = u32;
@@ -39,10 +39,15 @@ macro_rules! timed {
     }};
 }
 
-pub fn insert_ordered_at<T: Default + Clone>(
+pub fn insert_ordered_at<T: Default + Clone + Debug>(
     vec: &mut Vec<T>,
     mut to_insert: HashMap<usize, Vec<T>>,
 ) {
+
+    if to_insert.is_empty() {
+        return;
+    }
+
     let sorted_keys = {
         let mut sk = to_insert.keys().map(|k| *k).collect::<Vec<usize>>();
         sk.par_sort();
@@ -59,18 +64,14 @@ pub fn insert_ordered_at<T: Default + Clone>(
         })
         .collect::<Vec<(usize, usize)>>();
 
-    println!("{:?}", move_vec);
-
     let n_new = move_vec.last().unwrap_or(&(0, 0)).1;
     let orig_len = vec.len();
 
     vec.append(&mut vec![T::default(); n_new]);
 
-    println!("{:?}", vec.len());
-
     let mut move_vec_idx = move_vec.len() - 1;
     for i in (0..orig_len).rev() {
-        if (i < move_vec[move_vec_idx].0 && move_vec_idx > 0) {
+        if i < move_vec[move_vec_idx].0 && move_vec_idx > 0 {
             move_vec_idx = move_vec_idx - 1;
         }
 
@@ -79,7 +80,6 @@ pub fn insert_ordered_at<T: Default + Clone>(
         }
     }
 
-    let mut move_vec_idx = 0;
     let mut total_desp = 0;
     for key in sorted_keys.iter() {
         let idx = *key;
@@ -90,6 +90,8 @@ pub fn insert_ordered_at<T: Default + Clone>(
             total_desp += 1;
         }
     }
+
+    // println!("{:?}", vec);
 }
 
 #[cfg(test)]

@@ -1,10 +1,9 @@
 use super::{component::Component, ChunkId};
 
-use crate::{renderer::utils::StorageBufferData, utils::Id};
+use crate::renderer::utils::StorageBufferData;
 
-use nalgebra::{Matrix3, Vector2};
+use nalgebra::Matrix3;
 use encase::ShaderType;
-use tracing::info;
 
 
 /// This will be the buffer that holds all the components for the entities

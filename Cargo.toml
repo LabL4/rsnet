@@ -10,7 +10,7 @@ path = "src/main.rs"
 
 [lints.rust]
 dead_code = "allow"
-unused = "allow"
+# unused = "allow"
 
 [dependencies]
 cfg-if = "1.0.0"

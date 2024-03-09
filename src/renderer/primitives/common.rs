@@ -1,11 +1,9 @@
 use super::Primitives;
 
-use crate::renderer::primitives::{CirclePrimitive, LinePrimitive, RectanglePrimitive, shared::Fragments};
+use crate::renderer::primitives::*;
 
-use egui::Rect;
 use lazy_static::lazy_static;
 use nalgebra::Vector2;
-use rayon::vec;
 
 const MEMRISTOR_HEIGHT: f32 = 1.0;
 const MEMRISTOR_WIDTH: f32 = 0.4;

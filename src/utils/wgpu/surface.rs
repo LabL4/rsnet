@@ -32,7 +32,7 @@ impl<'a> SurfaceWrapper<'a> {
     /// us to wait until we recieve the `Resumed` event to do so.
     pub fn pre_adapter(&mut self, instance: &Instance, window: Arc<Window>) {
         if cfg!(target_arch = "wasm32") {
-            self.surface = Some(unsafe { instance.create_surface(window) }.unwrap());
+            self.surface = Some(instance.create_surface(window).unwrap());
         }
     }
 
@@ -62,7 +62,7 @@ impl<'a> SurfaceWrapper<'a> {
 
         // We didn't create the surface in pre_adapter, so we need to do so now.
         if !cfg!(target_arch = "wasm32") {
-            self.surface = Some(unsafe { context.instance.create_surface(window) }.unwrap());
+            self.surface = Some(context.instance.create_surface(window).unwrap());
         }
 
         // From here on, self.surface should be Some.

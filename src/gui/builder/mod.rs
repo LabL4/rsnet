@@ -2,7 +2,6 @@ use crate::app::State;
 
 use egui::RichText;
 use egui::{Color32, Context};
-use tracing::info;
 
 pub fn build(context: &Context, state: &mut State) {
     if !state.ui.is_style_applied {

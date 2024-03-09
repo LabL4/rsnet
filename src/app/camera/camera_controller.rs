@@ -2,7 +2,6 @@ use super::camera::Camera;
 use crate::utils::AaBb;
 
 use std::f32::consts::FRAC_PI_2;
-use egui::Window;
 use nalgebra::{Matrix4, Perspective3, Point3, RealField, UnitQuaternion, Vector2, Vector3};
 use tracing::info;
 use winit::{

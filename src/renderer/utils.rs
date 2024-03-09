@@ -3,7 +3,6 @@ use crate::scene::shared::SceneStorage;
 use super::shared::*;
 
 use std::{fmt::Debug, num::NonZeroU32};
-use bytemuck::{Pod, Zeroable};
 use encase::{internal::WriteInto, ShaderType, StorageBuffer, UniformBuffer};
 use tracing::info;
 use wgpu::{util::DeviceExt, Device};

@@ -6,11 +6,9 @@ use camera::CameraController;
 use crate::{gui::{self, renderer::GuiRenderer}, renderer::Renderer, scene, utils::wgpu::{context::Context, surface::SurfaceWrapper}};
 
 use std::{sync::Arc, iter};
-use winit::{event::WindowEvent, window::Window};
+use winit::window::Window;
 use wgpu::{TextureViewDescriptor, CommandEncoderDescriptor};
 use egui_wgpu::ScreenDescriptor;
-
-use self::camera::camera_controller;
 
 #[derive(Default)]
 pub struct State {

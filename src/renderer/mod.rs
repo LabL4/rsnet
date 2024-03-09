@@ -5,7 +5,7 @@ pub mod utils;
 
 use primitives::{
     common::*,
-    pipeline::{create_primitive_pipeline, Vertex, VertexBuffer},
+    pipeline::create_primitive_pipeline,
     shared::{FragmentsDataUniform, FragmentsStorage},
     utils::{attach_empty_fragment_storage, create_fragment_storage_bind_group},
 };
@@ -13,30 +13,28 @@ use shared::*;
 use utils::*;
 
 use crate::{
-    app::camera::{self, camera_controller, Camera, CameraController},
+    app::camera::{Camera, CameraController},
     renderer::primitives::shared::FragmentsData,
     scene::{
-        component,
         shared::{ComponentBufferEntry, SceneStorage},
-        utils::{chunk_id_from_position, iter_chunks_in_range, ChunkId, ChunkRange},
+        utils::{chunk_id_from_position, ChunkId, ChunkRange},
         Scene,
     },
     timed,
-    utils::{wgpu::context::Context, WindowSize},
+    utils::{insert_ordered_at, wgpu::context::Context, WindowSize},
 };
 
 use egui::ahash::HashSet;
 use rayon::prelude::*;
 use std::{
-    borrow::BorrowMut,
     collections::HashMap,
     marker::PhantomData,
     sync::{Arc, Mutex},
 };
 use tracing::{debug, info};
 use wgpu::{
-    core::device::queue, util::DeviceExt, Buffer, CommandEncoder, Device, Queue,
-    RenderPassColorAttachment, RenderPassDescriptor, SurfaceConfiguration, TextureView,
+    CommandEncoder, Device, Queue, RenderPassColorAttachment, RenderPassDescriptor,
+    SurfaceConfiguration, TextureView,
 };
 
 use self::primitives::utils::attach_fragment_data_uniform;
@@ -316,7 +314,7 @@ impl<'a> Renderer<'a> {
             //     info!("Fragments idx for 0 is {}", fragments_idx);
             // }
 
-            info!("Rendering {} components of type {}", n_components, ty);
+            // info!("Rendering {} components of type {}", n_components, ty);
 
             render_pass.set_bind_group(
                 3,
@@ -341,7 +339,7 @@ impl<'a> Renderer<'a> {
         camera_controller: &CameraController,
     ) -> Vec<(u32, u32)> {
         let mut fragments_type_vec = Vec::new();
-        for (ty, n_components) in cache.n_components_by_type.iter() {
+        for (ty, _n_components) in cache.n_components_by_type.iter() {
             let mut fragments_idx = match cache
                 .fragments_index_map
                 .get(ty)
@@ -369,7 +367,7 @@ impl<'a> Renderer<'a> {
                         fragments_data_uniform.fragments_data.uniform.fragments_idx;
 
                     if prev_fragment_idx != fragments_idx as u32 {
-                        info!("Prev was {}, new is {}", prev_fragment_idx, fragments_idx);
+                        // info!("Prev was {}, new is {}", prev_fragment_idx, fragments_idx);
                         let fragments_data = FragmentsData {
                             fragments_idx: fragments_idx as u32,
                         };
@@ -438,7 +436,7 @@ impl<'a> Renderer<'a> {
         &mut self,
         device: &Device,
         queue: &Queue,
-        camera_controller: &CameraController,
+        _camera_controller: &CameraController,
     ) {
         if self.shared.fragments_storage.fragments.is_dirty() {
             // println!("n_circles: {}", self.shared.fragments_storage.fragments.get()[0].n_circles);
@@ -497,7 +495,6 @@ impl<'a> Renderer<'a> {
             let mut components = self.shared.scene_storage.components.get_mut();
             let n_components_by_type = &mut self.cache.n_components_by_type;
 
-            let visible_chunks = &mut self.cache.visible_chunks;
             let chunk_range = &mut self.cache.chunk_range;
 
             let actual_chunk_range = ChunkRange {
@@ -509,20 +506,6 @@ impl<'a> Renderer<'a> {
                 chunk_range.diff(&actual_chunk_range),
                 "Diffing"
             };
-
-            // info!("prev_chunk_range: {:#?}", chunk_range);
-            // info!("actual_chunk_range: {:#?}", actual_chunk_range);
-
-            // info!("in_self_not_other: {:#?}", in_self_not_other);
-            // info!("in_other_not_self: {:#?}", in_other_not_self);
-
-            // The start positions for types in component array
-            // let mut acc = 0;
-            // let start_positions = n_components_by_type.iter().map(|(ty, n)| {
-            //     let start_p = acc;
-            //     acc += n;
-            //     (*ty, start_p)
-            // }).collect::<HashMap<u32, usize>>();
 
             let compute_start_positions = |n_components_by_type: &HashMap<u32, usize>| {
                 let mut acc = 0;
@@ -540,8 +523,7 @@ impl<'a> Renderer<'a> {
             let (mut n_aditions, mut n_deletions) = (0, 0);
 
             let start_positions = compute_start_positions(n_components_by_type);
-            let mut to_remove = Arc::new(Mutex::new(Vec::<(u32, u32)>::new()));
-
+            let to_remove = Arc::new(Mutex::new(Vec::<(u32, u32)>::new()));
             timed!(
                 {
                     // To delete
@@ -549,16 +531,19 @@ impl<'a> Renderer<'a> {
                         if components.len() == 0 {
                             return;
                         }
-                        // info!("Not seeing chunk {:#?}", chunk_id);
+
                         if let Some(chunk) = scene.components().get(&chunk_id) {
                             for component in chunk {
                                 let start_p = start_positions.get(&component.ty()).unwrap_or(&0);
                                 let n_components =
                                     n_components_by_type.get(&component.ty()).unwrap_or(&1);
+
                                 // get the slice for the type
                                 let c = &components[*start_p..(*start_p + n_components)];
+
                                 // insert ordered by id
-                                if let Ok(idx) = c.binary_search_by(|a| a.id.cmp(&component.id())) {
+                                if let Ok(_idx) = c.binary_search_by(|a| a.id.cmp(&component.id()))
+                                {
                                     to_remove
                                         .lock()
                                         .unwrap()
@@ -570,15 +555,13 @@ impl<'a> Renderer<'a> {
                     });
                     let mut to_remove = to_remove.lock().unwrap().clone();
 
-                    to_remove
-                        .iter()
-                        .for_each(|(id, ty)| match n_components_by_type.get_mut(ty) {
-                            Some(n) => {
-                                *n -= 1;
-                                n_deletions += 1;
-                            }
-                            None => {}
+                    to_remove.iter().for_each(|(_id, ty)| {
+                        n_components_by_type.get_mut(ty).map(|n| {
+                            *n -= 1;
+                            n_deletions += 1;
                         });
+                    });
+
                     to_remove.par_sort();
 
                     components
@@ -595,226 +578,64 @@ impl<'a> Renderer<'a> {
                 if comp.ty < prev_ty {
                     info!("components: {:#?}", components);
                     panic!("Not sorted by type after removing components");
-                    break;
                 }
                 prev_ty = comp.ty;
             }
 
-            // info!("n_components_by_type_0: {:#?}", n_components_by_type.get(&0).unwrap_or(&0));
-
-            let start_positions = compute_start_positions(&n_components_by_type);
             // Where to insert and the components to insert
-            let mut to_insert = Arc::new(Mutex::new(
+            let to_insert = Arc::new(Mutex::new(Some(
                 HashMap::<usize, Vec<ComponentBufferEntry>>::new(),
-            ));
+            )));
             timed!(
                 {
-                    // for chunk_id in in_other_not_self {
                     in_other_not_self.par_iter().for_each(|chunk_id| {
                         if let Some(chunk) = scene.components().get(&chunk_id) {
                             for component in chunk {
-                                // if components.len() == 0 {
-                                //     components.push(ComponentBufferEntry::from_component(component));
-                                //     n_components_by_type.insert(component.ty(), 1);
-                                //     continue;
-                                // }
-
-                                let start_p = start_positions.get(&component.ty()).unwrap_or(&0);
-                                let n_comps =
-                                    n_components_by_type.get(&component.ty()).unwrap_or(&0);
-
-                                // get the slice for the type
-                                let components_slice = {
-                                    if n_comps == &0 {
-                                        &components
-                                    } else {
-                                        &components[*start_p..(*start_p + n_comps)]
-                                    }
-                                };
-                                // let comp_slice_prev_comp_ids = components_slice.iter().map(|c| c.id).collect::<Vec<u32>>();
-                                // insert ordered by id
-                                if let Err(mut i) = components.binary_search_by(|a| {
+                                // insert ordered by type chained with id
+                                if let Err(i) = components.binary_search_by(|a| {
                                     a.ty()
                                         .cmp(&component.ty())
                                         .then(a.id().cmp(&component.id()))
-                                })
-                                // .binary_search_by(|a| component.ty().cmp(&a.ty()).then(component.id().cmp(&a.id()) ))
-                                {
-                                    // info!("prev components ids: {:#?}", prev_comp_ids);
-                                    // info!("prev components_slice ids {}: {:#?}", n_comps, comp_slice_prev_comp_ids);
-
-                                    // if i == components_slice.len() {
-                                    //     // i += 1;
-                                    //     i += 0;
-                                    // } else {
-                                    //     i += *start_p;
-                                    // }
-
-                                    // if n_comps == &0 {
-                                    //    info!("inserting type {} at {} + {}", component.ty(), i, components.len());
-                                    //    i += components.len();
-                                    // }
-
+                                }) {
                                     let mut to_insert = to_insert.lock().unwrap();
 
-                                    to_insert.entry(i).or_insert(Vec::new());
-                                    let entry = to_insert.get_mut(&i).unwrap();
-                                    // Insert in entry ordered by id
-                                    if let Err(mut j) =
-                                        // sort first by type, then by id
-                                        // entry.binary_search_by(|a| component.ty().cmp(&a.ty()).then(component.id().cmp(&a.id()) ))
-                                        entry.binary_search_by(|a| {
-                                            a.ty()
-                                                .cmp(&component.ty())
-                                                .then(a.id().cmp(&component.id()))
-                                        })
-                                    {
+                                    // to_insert.entry(i).or_insert(Vec::new());
+                                    // let entry = to_insert.get_mut(&i).unwrap();
+                                    let entry =
+                                        to_insert.as_mut().unwrap().entry(i).or_insert(Vec::new());
+
+                                    // Insert in entry ordered by type chained with id
+                                    if let Err(j) = entry.binary_search_by(|a| {
+                                        a.ty()
+                                            .cmp(&component.ty())
+                                            .then(a.id().cmp(&component.id()))
+                                    }) {
                                         entry.insert(
                                             j,
                                             ComponentBufferEntry::from_component(component),
                                         );
                                     }
-                                    // (ComponentBufferEntry::from_component(component));
                                 }
                             }
                         }
                     });
 
-                    let mut to_insert = to_insert.lock().unwrap();
+                    let to_insert = to_insert.lock().unwrap().take().unwrap();
 
-                    if to_insert.len() != 0 {
-                        // return;
+                    to_insert.iter().for_each(|(_idx, comps)| {
+                        comps.iter().for_each(|c| {
+                            n_components_by_type
+                                .entry(c.ty)
+                                .and_modify(|n| *n += 1)
+                                .or_insert(1);
+                            n_aditions += 1;
+                        });
+                    });
 
-                        let sorted_keys = {
-                            let mut sk = to_insert.keys().map(|k| *k).collect::<Vec<usize>>();
-                            sk.sort();
-                            sk
-                        };
-
-                        let move_vec = sorted_keys
-                            .iter()
-                            .scan(0, |acc, key| {
-                                let comps = to_insert.get(key).unwrap();
-                                let idx = key;
-                                *acc += comps.len();
-                                Some((*idx, *acc))
-                            })
-                            .collect::<Vec<(usize, usize)>>();
-
-                        // let move_vec = to_insert.iter().scan(0, |acc, (idx, comps)| {
-                        //     *acc += comps.len();
-                        //     Some((*idx, *acc))
-                        // }).collect::<Vec<(usize, usize)>>();
-
-                        let prev_comps = components.clone();
-                        let prev_to_insert = to_insert.clone();
-
-                        // info!("components: {:#?}", components);
-                        // info!("move_vec: {:#?}", move_vec);
-                        // info!("to_insert: {:#?}", to_insert);
-                        let n_new = move_vec.last().unwrap_or(&(0, 0)).1;
-
-                        let mut new_components_empty = vec![ComponentBufferEntry::default(); n_new];
-
-                        let prev_len = components.len();
-                        components.append(&mut new_components_empty);
-
-                        let mut move_vec_idx = move_vec.len() - 1;
-                        for i in (0..prev_len).rev() {
-                            if (i < move_vec[move_vec_idx].0 && move_vec_idx > 0) {
-                                // info!("i: {}", i);
-                                move_vec_idx = move_vec_idx - 1;
-                            }
-                            // components[i+move_vec[move_vec_idx].1] = components[i];
-                            if i >= move_vec[move_vec_idx].0 {
-                                components.swap(i, i + move_vec[move_vec_idx].1);
-                            }
-                            // components.swap(i, i+move_vec[move_vec_idx].1);
-                        }
-
-                        // let mut move_vec_idx = 0;
-                        // let mut total_desp = 0;
-                        // for key in sorted_keys.iter() {
-                        //     let idx = *key;
-                        //     let comps = to_insert.remove(key).unwrap();
-                        //     let desp = total_desp;
-                        //     for (i, comp) in comps.into_iter().enumerate() {
-                        //         match n_components_by_type.get_mut(&comp.ty) {
-                        //             Some(n) => {
-                        //                 *n += 1;
-                        //                 n_deletions += 1;
-                        //             }
-                        //             None => {
-                        //                 n_components_by_type.insert(comp.ty, 1);
-                        //             }
-                        //         }
-                        //         components[idx + i + desp] = comp;
-                        //         total_desp += 1;
-                        //     }
-                        // }
-
-                        // to_insert.iter().for_each(|(idx, comps)| {
-                        //     comps.iter().for_each(|c| {
-                        //         n_components_by_type
-                        //             .entry(c.ty)
-                        //             .and_modify(|n| *n += 1)
-                        //             .or_insert(1);
-                        //     })
-                        // });
-
-                        
-
-                        // Check if components is sorted by type
-                        let mut prev_ty = 0;
-                        for comp in components.iter() {
-                            if comp.ty < prev_ty {
-                                info!("to_insert: {:#?}", prev_to_insert);
-                                info!("prev components: {:#?}", prev_comps);
-                                info!("components: {:#?}", components);
-
-                                panic!("Not sorted by type after adding components");
-                                break;
-                            }
-                            prev_ty = comp.ty;
-                        }
-
-                        // check if there is some component with index 0
-                        // for comp in components.iter() {
-                        //     if comp.id == 0 {
-                        //         info!("prev_comps: {:#?}", prev_comps);
-                        //         info!("to_insert: {:#?}", prev_to_insert);
-                        //         info!("move_vec: {:#?}", move_vec);
-                        //         info!("components: {:#?}", components);
-                        //         panic!("Component with id 0");
-                        //     }
-                        // }
-
-                        // check if components array is sorted by id
-                        // let mut prev_id = 0;
-                        // for comp in components.iter() {
-                        //     if comp.id < prev_id {
-                        //         info!("prev_comps: {:#?}", prev_comps);
-                        //         info!("to_insert: {:#?}", prev_to_insert);
-                        //         info!("move_vec: {:#?}", move_vec);
-                        //         info!("components: {:#?}", components);
-                        //         panic!("Not sorted by id");
-                        //         break;
-                        //     }
-                        //     prev_id = comp.id;
-                        // }
-
-                        // info!("components: {:#?}", components);
-                        // info!("n_components_by_type_0: {:#?}", n_components_by_type.get(&0).unwrap());
-                        // info!("components.len(): {}", components.len());
-                    }
+                    insert_ordered_at(&mut components, to_insert);
                 },
                 "Adding components"
             );
-
-            // info!("There are {} components", components.len());
-            // info!("components \n{:#?}", components);
-
-            // info!("components ids:\n{:#?}", components.iter().map(|c| c.id).collect::<Vec<u32>>());
 
             timed!(
                 if n_aditions + n_deletions > 0 {
