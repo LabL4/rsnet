@@ -41,6 +41,12 @@ pub struct Fragments {
     pub n_rectangles: u32
 }
 
+impl Fragments {
+    pub fn n_fragments(&self) -> u32 {
+        self.n_circles + self.n_lines + self.n_rectangles
+    }
+}
+
 pub struct FragmentsStorage {
     pub fragments: StorageBufferData<Vec<Fragments>>,
     pub bind_group: wgpu::BindGroup,

@@ -35,8 +35,8 @@ impl Scene {
         };
 
         // Add 10M components to the scene
-        let n_cols = 1000;
-        let n_rows = 1000;
+        let n_cols = 4;
+        let n_rows = 4;
 
         // let n_cols = 1000;
         // let n_rows = 1000;

@@ -2,6 +2,7 @@ pub mod pipeline;
 pub mod shared;
 pub mod utils;
 pub mod common; // Common set of primitives (Memristor, Resistor, etc)
+pub mod render;
 
 use nalgebra::Vector2;
 

@@ -45,10 +45,6 @@ impl ComponentBufferEntry {
 /// that is used to render the visible part of the scene.
 pub struct SceneStorage {
     pub components: StorageBufferData<Vec<ComponentBufferEntry>>,
-    /// `chunks` stores the minimum and maximum chunk Id that is currently visible in the scene.
-    /// This is used to know when to update the `components` buffer.
-    /// None means that the scene storage is empty.
-    pub chunks: Option<(ChunkId, ChunkId)>,
     pub bind_group: wgpu::BindGroup,
     pub bind_group_layout: wgpu::BindGroupLayout,
 }

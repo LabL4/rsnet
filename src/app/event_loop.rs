@@ -3,7 +3,7 @@ use super::App;
 use crate::gui::renderer::GuiRenderer;
 use crate::renderer::Renderer;
 use crate::utils::frame_counter::FrameCounter;
-use crate::utils::wgpu::{context::Context, surface::SurfaceWrapper};
+use crate::utils::wgpu::{Context, SurfaceWrapper};
 
 use std::sync::Arc;
 use tracing_subscriber::{fmt, filter::EnvFilter, prelude::*};

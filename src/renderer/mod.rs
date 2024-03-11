@@ -84,7 +84,7 @@ impl<'a> Renderer<'a> {
         );
 
         // This is the scene cache on GPU
-        let scene_storage = attach_empty_scene_storage(&device);
+        let mut scene_storage = attach_empty_scene_storage(&device);
 
         let mut fragments_storage = attach_empty_fragment_storage(&device);
 
@@ -129,6 +129,11 @@ impl<'a> Renderer<'a> {
         };
 
         let mut cache = Cache::default();
+        cache.chunk_range = ChunkRange {
+            min_chunk: (-100, -100),
+            max_chunk: (-100, -100),
+        };
+
         cache
             .fragments_index_map
             .insert(0, vec![(0, 400.0), (1, 1200.0)]);
@@ -216,12 +221,6 @@ impl<'a> Renderer<'a> {
 
         self.check_and_update_fragments_storage(&context.device, &context.queue, camera_controller);
 
-        // timed!(self.check_and_update_scene_storage(
-        //     &context.device,
-        //     &context.queue,
-        //     camera_controller,
-        //     scene,
-        // ), "Scene storage update");
         self.check_and_update_scene_storage(
             &context.device,
             &context.queue,
@@ -251,13 +250,13 @@ impl<'a> Renderer<'a> {
 
         // self.render_effects(&mut render_pass);
 
-        Self::render_effects(
+        effects::render::render_effects(
             &mut render_pass,
             &self.pipelines.grid_effect,
             &self.shared.common_uniforms.bind_group,
         );
 
-        Self::render_primitives(
+        primitives::render::render_primitives(
             &mut render_pass,
             &self.pipelines.primitive,
             &context,
@@ -269,155 +268,7 @@ impl<'a> Renderer<'a> {
             &self.shared.common_uniforms.bind_group,
         );
     }
-
-    fn render_primitives<'b, 'c>(
-        render_pass: &mut wgpu::RenderPass<'c>,
-        pipeline: &'b wgpu::RenderPipeline,
-        context: &Context,
-        camera_controller: &CameraController,
-        cache: &mut Cache,
-        fragments_storage: &'b FragmentsStorage,
-        fragments_data_uniform_map: &'b mut HashMap<u32, FragmentsDataUniform>,
-        // fragments_storage_bind_group: &'b wgpu::BindGroup,
-        scene_storage_bind_group: &'b wgpu::BindGroup,
-        common_uniforms_bind_group: &'b wgpu::BindGroup,
-    ) where
-        'b: 'c,
-    {
-        render_pass.set_pipeline(pipeline);
-
-        render_pass.set_bind_group(0, &common_uniforms_bind_group, &[]);
-        render_pass.set_bind_group(1, &fragments_storage.bind_group, &[]);
-        render_pass.set_bind_group(2, &scene_storage_bind_group, &[]);
-
-        let fragments_type_vec = Self::check_and_update_fragments_data_uniforms(
-            &context.device,
-            &context.queue,
-            cache,
-            fragments_data_uniform_map,
-            camera_controller,
-        );
-
-        // Draw each batch
-        let mut n_rendered = 0;
-        // for (ty, n_components) in cache.n_components_by_type.iter() {
-        for (fragments_idx, ty) in fragments_type_vec.iter() {
-            let fragments = &fragments_storage.fragments.get()[*fragments_idx as usize];
-            let n_fragments = fragments.n_circles + fragments.n_lines + fragments.n_rectangles;
-
-            let n_components = cache.n_components_by_type.get(ty).unwrap();
-
-            // info!("Rendering {} components of type {}", n_components, ty);
-            // render_pass.set_vertex_buffer(0, self.shared.vertex_buffer.buffer.slice(..));
-
-            // if *ty == 0 {
-            //     info!("Fragments idx for 0 is {}", fragments_idx);
-            // }
-
-            // info!("Rendering {} components of type {}", n_components, ty);
-
-            render_pass.set_bind_group(
-                3,
-                &fragments_data_uniform_map.get(&ty).unwrap().bind_group,
-                &[],
-            );
-
-            render_pass.draw(
-                0..(n_fragments * 6),
-                n_rendered..(*n_components as u32 + n_rendered),
-            );
-            n_rendered += *n_components as u32;
-        }
-    }
-
-    // Returns <fragments_idx, ty>
-    pub fn check_and_update_fragments_data_uniforms(
-        device: &Device,
-        queue: &Queue,
-        cache: &Cache,
-        fragments_data_uniform_map: &mut HashMap<u32, FragmentsDataUniform>,
-        camera_controller: &CameraController,
-    ) -> Vec<(u32, u32)> {
-        let mut fragments_type_vec = Vec::new();
-        for (ty, _n_components) in cache.n_components_by_type.iter() {
-            let mut fragments_idx = match cache
-                .fragments_index_map
-                .get(ty)
-                .unwrap()
-                .binary_search_by_key(&(camera_controller.radius() as usize), |v| v.1 as usize)
-            {
-                Ok(i) => i,
-                Err(i) => i,
-            };
-
-            if fragments_idx >= cache.fragments_index_map.get(ty).unwrap().len() {
-                // fragment_idx = cache.fragments_index_map.get(ty).unwrap().len() - 1;
-                continue;
-            }
-
-            fragments_idx = cache.fragments_index_map.get(ty).unwrap()[fragments_idx].0 as usize;
-
-            if *ty == 0 {
-                // info!("Fragments idx for 0 is {}", fragments_idx);
-            }
-
-            match fragments_data_uniform_map.get_mut(ty) {
-                Some(fragments_data_uniform) => {
-                    let prev_fragment_idx =
-                        fragments_data_uniform.fragments_data.uniform.fragments_idx;
-
-                    if prev_fragment_idx != fragments_idx as u32 {
-                        // info!("Prev was {}, new is {}", prev_fragment_idx, fragments_idx);
-                        let fragments_data = FragmentsData {
-                            fragments_idx: fragments_idx as u32,
-                        };
-                        fragments_data_uniform.fragments_data.set(fragments_data);
-                        // .write(&fragments_data)
-                        // .unwrap();
-                        queue.write_buffer(
-                            &fragments_data_uniform.fragments_data.buffer,
-                            0,
-                            fragments_data_uniform.fragments_data.encase_buffer.as_ref(),
-                        );
-                    }
-                }
-                None => {
-                    let mut fragments_data_uniform = attach_fragment_data_uniform(device);
-                    let fragments_data = FragmentsData {
-                        fragments_idx: fragments_idx as u32,
-                    };
-
-                    fragments_data_uniform.fragments_data.set(fragments_data);
-                    queue.write_buffer(
-                        &fragments_data_uniform.fragments_data.buffer,
-                        0,
-                        fragments_data_uniform.fragments_data.encase_buffer.as_ref(),
-                    );
-
-                    fragments_data_uniform_map.insert(*ty, fragments_data_uniform);
-                }
-            }
-
-            fragments_type_vec.push((fragments_idx as u32, *ty));
-        }
-
-        fragments_type_vec
-    }
-
-    #[inline]
-    fn render_effects<'b, 'c>(
-        render_pass: &mut wgpu::RenderPass<'c>,
-        pipeline: &'b wgpu::RenderPipeline,
-        common_uniforms_bind_group: &'b wgpu::BindGroup,
-    ) where
-        'b: 'c,
-    {
-        render_pass.set_pipeline(pipeline);
-
-        render_pass.set_bind_group(0, common_uniforms_bind_group, &[]);
-
-        render_pass.draw(0..4, 0..1);
-    }
+    
 
     /// This function checks if the common uniforms have changed, and updates the GPU buffer if they have.
     fn check_and_update_common_uniforms(
@@ -487,20 +338,18 @@ impl<'a> Renderer<'a> {
         let max_chunk =
             chunk_id_from_position(&camera_controller.screen_world_aabb.max, scene.chunk_size());
 
-        if self.shared.scene_storage.chunks != Some((min_chunk, max_chunk)) {
-            self.shared.scene_storage.chunks = Some((min_chunk, max_chunk));
+        let actual_chunk_range = ChunkRange {
+            min_chunk,
+            max_chunk,
+        };
 
+        if self.cache.chunk_range != actual_chunk_range {
             // debug!("Visible chunks changed, updating components, ({}, {}), ({}, {})", min_chunk.0, min_chunk.1, max_chunk.0, max_chunk.1);
 
             let mut components = self.shared.scene_storage.components.get_mut();
             let n_components_by_type = &mut self.cache.n_components_by_type;
 
             let chunk_range = &mut self.cache.chunk_range;
-
-            let actual_chunk_range = ChunkRange {
-                min_chunk,
-                max_chunk,
-            };
 
             let (in_self_not_other, in_other_not_self) = timed! {
                 chunk_range.diff(&actual_chunk_range),
@@ -523,37 +372,45 @@ impl<'a> Renderer<'a> {
             let (mut n_aditions, mut n_deletions) = (0, 0);
 
             let start_positions = compute_start_positions(n_components_by_type);
-            let to_remove = Arc::new(Mutex::new(Vec::<(u32, u32)>::new()));
+            // to_remove is a vec of (id, type)
+            // let to_remove = Arc::new(Mutex::new(Vec::<(u32, u32)>::new()));
+            let to_remove = Arc::new(Mutex::new(HashMap::<u32, u32>::new()));
             timed!(
                 {
                     // To delete
-                    in_self_not_other.par_iter().for_each(|chunk_id| {
+                    in_self_not_other.iter().for_each(|chunk_id| {
                         if components.len() == 0 {
                             return;
                         }
 
                         if let Some(chunk) = scene.components().get(&chunk_id) {
-                            for component in chunk {
+                            chunk.par_iter().for_each(|component| {
                                 let start_p = start_positions.get(&component.ty()).unwrap_or(&0);
                                 let n_components =
-                                    n_components_by_type.get(&component.ty()).unwrap_or(&1);
+                                    n_components_by_type.get(&component.ty()).unwrap_or(&0);
+
+                                if *n_components == 0 {
+                                    return;
+                                }
 
                                 // get the slice for the type
-                                let c = &components[*start_p..(*start_p + n_components)];
+                                let comps_slice = &components[*start_p..(*start_p + n_components)];
 
                                 // insert ordered by id
-                                if let Ok(_idx) = c.binary_search_by(|a| a.id.cmp(&component.id()))
-                                {
+                                if let Ok(_idx) = comps_slice.binary_search_by(|c| {
+                                    c.ty()
+                                        .cmp(&component.ty())
+                                        .then(c.id().cmp(&component.id()))
+                                }) {
                                     to_remove
                                         .lock()
                                         .unwrap()
-                                        .push((component.id(), component.ty()));
-                                    // to_remove.push((component.id(), component.ty()));
+                                        .insert(component.id(), component.ty());
                                 }
-                            }
+                            });
                         }
                     });
-                    let mut to_remove = to_remove.lock().unwrap().clone();
+                    let to_remove = to_remove.lock().unwrap().clone();
 
                     to_remove.iter().for_each(|(_id, ty)| {
                         n_components_by_type.get_mut(ty).map(|n| {
@@ -562,20 +419,15 @@ impl<'a> Renderer<'a> {
                         });
                     });
 
-                    to_remove.par_sort();
-
-                    components
-                        .retain(|c| !to_remove.binary_search_by_key(&c.id, |(id, _)| *id).is_ok());
+                    components.retain(|comp| !to_remove.contains_key(&comp.id()));
                 },
                 "Deleting components"
             );
 
-            // info!("components after delete: {:#?}", components);
-
             // Check if components is sorted by type
             let mut prev_ty = 0;
             for comp in components.iter() {
-                if comp.ty < prev_ty {
+                if comp.ty < prev_ty || comp.id() == 0 {
                     info!("components: {:#?}", components);
                     panic!("Not sorted by type after removing components");
                 }
@@ -588,9 +440,9 @@ impl<'a> Renderer<'a> {
             )));
             timed!(
                 {
-                    in_other_not_self.par_iter().for_each(|chunk_id| {
+                    in_other_not_self.iter().for_each(|chunk_id| {
                         if let Some(chunk) = scene.components().get(&chunk_id) {
-                            for component in chunk {
+                            chunk.par_iter().for_each(|component| {
                                 // insert ordered by type chained with id
                                 if let Err(i) = components.binary_search_by(|a| {
                                     a.ty()
@@ -616,7 +468,7 @@ impl<'a> Renderer<'a> {
                                         );
                                     }
                                 }
-                            }
+                            });
                         }
                     });
 
@@ -631,16 +483,18 @@ impl<'a> Renderer<'a> {
                             n_aditions += 1;
                         });
                     });
-
-                    insert_ordered_at(&mut components, to_insert);
+                    timed!(
+                        insert_ordered_at(&mut components, to_insert),
+                        "insert_ordered_at"
+                    )
                 },
                 "Adding components"
             );
 
+            self.cache.chunk_range = actual_chunk_range;
+
             timed!(
                 if n_aditions + n_deletions > 0 {
-                    self.cache.chunk_range = actual_chunk_range;
-
                     // self.shared.scene_storage.components.set(components.clone());
                     let prev_size = self
                         .shared

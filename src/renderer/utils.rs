@@ -28,6 +28,10 @@ impl<T: ShaderType + WriteInto>UniformBufferData<T> {
         self.encase_buffer.write(&self.uniform).unwrap();
     }
 
+    pub fn get(&self) -> &T {
+        &self.uniform
+    }
+
     pub fn buffer(&self) -> &wgpu::Buffer {
         &self.buffer
     }
@@ -334,7 +338,6 @@ pub fn attach_empty_scene_storage(device: &Device) -> SceneStorage {
 
     SceneStorage {
         components,
-        chunks: None,
         bind_group,
         bind_group_layout,
     }

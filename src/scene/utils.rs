@@ -8,6 +8,13 @@ pub struct ChunkRange {
     pub max_chunk: ChunkId
 }
 
+// Implement PartialEq for ChunkRange
+impl PartialEq for ChunkRange {
+    fn eq(&self, other: &Self) -> bool {
+        self.min_chunk == other.min_chunk && self.max_chunk == other.max_chunk
+    }
+}
+
 impl ChunkRange {
     pub fn contains(&self, chunk: &ChunkId) -> bool {
         let min_chunk = &self.min_chunk;
@@ -30,7 +37,7 @@ impl ChunkRange {
         let mut in_other_not_self = Vec::new();
         
         if !self.overlaps(other) {
-            return (in_self_not_other, in_other_not_self);
+            return (iter_chunks_in_range(&self.min_chunk, &self.max_chunk).collect(), iter_chunks_in_range(&other.min_chunk, &other.max_chunk).collect());
         }
 
         for chunk in iter_chunks_in_range(&self.min_chunk, &self.max_chunk) {
