@@ -7,7 +7,8 @@ use crate::renderer::Cache;
 use crate::app::camera::CameraController;
 use crate::utils::wgpu::Context;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use tracing::info;
 use wgpu::{Device, Queue};
 
 pub fn render_primitives<'b, 'c>(
@@ -41,8 +42,8 @@ pub fn render_primitives<'b, 'c>(
     // Draw each batch
     let mut n_rendered = 0;
     for (fragments_idx, ty) in fragments_type_vec.iter() {
-        let fragments = &fragments_storage.fragments.get()[*fragments_idx as usize];
-        let n_fragments = fragments.n_fragments();
+        let component_ty_fragments = &fragments_storage.component_ty_fragments.get()[*fragments_idx as usize];
+        let n_fragments = component_ty_fragments.n_fragments();
 
         let n_components = cache.n_components_by_type.get(ty).unwrap();
 
@@ -51,6 +52,8 @@ pub fn render_primitives<'b, 'c>(
             &fragments_data_uniform_map.get(&ty).unwrap().bind_group,
             &[],
         );
+
+        info!("Rendering {} fragments for type {} for {} components", n_fragments, ty, n_components);
 
         render_pass.draw(
             0..(n_fragments * 6),
@@ -69,6 +72,7 @@ fn check_and_update_fragments_data_uniforms(
     camera_controller: &CameraController,
 ) -> Vec<(u32, u32)> {
     let mut fragments_type_vec = vec![(0u32, 0u32); cache.n_components_by_type.len()];
+    let mut positions = HashSet::<u32>::new();
     
     for (ty, _n_components) in cache.n_components_by_type.iter() {
         let mut fragments_idx = match cache
@@ -130,7 +134,13 @@ fn check_and_update_fragments_data_uniforms(
         }
 
         fragments_type_vec[*ty as usize] = (fragments_idx as u32, *ty);
+        positions.insert(*ty);
+
     }
+
+    fragments_type_vec.retain(|(_fragments_idx, ty)| {
+        positions.contains(ty)
+    });
 
     fragments_type_vec
 }

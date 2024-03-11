@@ -29,29 +29,48 @@ pub struct RectangleFragment {
     pub color: u32
 }
 
-#[derive(Debug, ShaderType)]
-pub struct Fragments {
-    pub circles: [CircleFragment; MAX_FRAGMENTS],
-    pub n_circles: u32,
-    
-    pub lines: [LineFragment; MAX_FRAGMENTS],
-    pub n_lines: u32,
-
-    pub rectangles: [RectangleFragment; MAX_FRAGMENTS],
-    pub n_rectangles: u32
+#[derive(Debug, Clone, Copy, Default, ShaderType)]
+pub struct TriangleFragment {
+    pub position: Vector2<f32>,
+    pub size: Vector2<f32>,
+    pub dir_vec: Vector2<f32>,
+    pub color: u32
 }
 
-impl Fragments {
+#[derive(Debug, ShaderType)]
+pub struct ComponentTyFragments {
+    pub circles_start: u32,
+    pub n_circles: u32,
+
+    pub lines_start: u32,
+    pub n_lines: u32,
+
+    pub rectangles_start: u32,
+    pub n_rectangles: u32,
+
+    pub triangles_start: u32,
+    pub n_triangles: u32,
+}
+
+impl ComponentTyFragments {
     pub fn n_fragments(&self) -> u32 {
-        self.n_circles + self.n_lines + self.n_rectangles
+        self.n_circles + self.n_lines + self.n_rectangles + self.n_triangles
     }
 }
 
 pub struct FragmentsStorage {
-    pub fragments: StorageBufferData<Vec<Fragments>>,
+
+    pub component_ty_fragments: StorageBufferData<Vec<ComponentTyFragments>>,
+
+    pub circle_fragments: StorageBufferData<Vec<CircleFragment>>,
+    pub line_fragments: StorageBufferData<Vec<LineFragment>>,
+    pub rectangle_fragments: StorageBufferData<Vec<RectangleFragment>>,
+    pub triangles_fragments: StorageBufferData<Vec<TriangleFragment>>,
+
     pub bind_group: wgpu::BindGroup,
     pub bind_group_layout: wgpu::BindGroupLayout
 }
+
 
 #[derive(Debug, ShaderType)]
 pub struct FragmentsData {

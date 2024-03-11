@@ -46,7 +46,7 @@ pub fn uniform_as_wgsl_bytes<'a, T: ShaderType + WriteInto + Debug>(
     Ok(buffer)
 }
 
-pub fn storage_as_wgsl_bytes<'a, T: ShaderType + WriteInto + Debug>(
+pub fn storage_as_wgsl_bytes<'a, T: ShaderType + WriteInto>(
     value: &T,
 ) -> encase::internal::Result<StorageBuffer<Vec<u8>>> {
     // println!("as_wgsl_bytes: value: {:?}", value);

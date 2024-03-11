@@ -38,8 +38,8 @@ impl Scene {
         let n_cols = 4;
         let n_rows = 4;
 
-        // let n_cols = 1000;
-        // let n_rows = 1000;
+        let n_cols = 1000;
+        let n_rows = 1000;
         
         for i in 0..n_rows {
             for j in 0..n_cols {
@@ -47,7 +47,7 @@ impl Scene {
                 let pos = Vector2::new(i as f32, j as f32) * spacing;
                 let id = j+1 + i*n_cols;
                 // info!("Adding component with id {}", j + i*n_cols);
-                scene.add_component(Component::new(id, 0, pos, (id % 3) as f32  , id%2));
+                scene.add_component(Component::new(id, 0, pos, 0.0  , id%3));
             }
         } 
 

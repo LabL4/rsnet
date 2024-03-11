@@ -5,63 +5,32 @@ pub mod common; // Common set of primitives (Memristor, Resistor, etc)
 pub mod render;
 
 use nalgebra::Vector2;
+use tracing::info;
 
-use self::shared::{CircleFragment, Fragments, LineFragment, RectangleFragment, MAX_FRAGMENTS};
+use self::shared::*;
 
 #[derive(Debug)]
-pub struct Primitives {
+pub struct ComponentTyPrimitives {
     pub circles: Vec<CirclePrimitive>,
     pub lines: Vec<LinePrimitive>,
-    pub rectangles: Vec<RectanglePrimitive>
+    pub rectangles: Vec<RectanglePrimitive>,
+    pub triangles: Vec<TrianglePrimitive>
 }
 
-impl Primitives {
-    pub fn to_fragments(&self) -> Fragments {
-        let mut circles = [CircleFragment::default(); MAX_FRAGMENTS];
-        let mut n_circles = 0;
-    
-        let mut lines = [LineFragment::default(); MAX_FRAGMENTS];
-        let mut n_lines = 0;
-    
-        let mut rectangles = [RectangleFragment::default(); MAX_FRAGMENTS];
-        let mut n_rectangles = 0;
-    
-        for circle in &self.circles {
-            let circle_fragments = circle.to_fragments();
-            for i in 0..circle_fragments.len() {
-                circles[n_circles] = circle_fragments[i];
-                n_circles += 1;
-            }
-        }
-    
-        for line in &self.lines {
-            let line_fragments = line.to_fragments();
-            for i in 0..line_fragments.len() {
-                lines[n_lines] = line_fragments[i];
-                n_lines += 1;
-            }
-        }
+impl ComponentTyPrimitives {
+    pub fn to_fragments(&self) -> (
+        Vec<CircleFragment>,
+        Vec<LineFragment>,
+        Vec<RectangleFragment>,
+        Vec<TriangleFragment>
+    ) {
 
-        // info!("Line fragments!!!: {:?}", lines[0..n_lines].to_vec());
-    
-        for rectangle in &self.rectangles {
-            let rectangle_fragments = rectangle.to_fragments();
-            for i in 0..rectangle_fragments.len() {
-                rectangles[n_rectangles] = rectangle_fragments[i];
-                n_rectangles += 1;
-            }
-        }
-    
-        Fragments {
-            circles: circles,
-            n_circles: n_circles as u32,
-    
-            lines: lines,
-            n_lines: n_lines as u32,
-    
-            rectangles: rectangles,
-            n_rectangles: n_rectangles as u32,
-        }
+        let circles = self.circles.iter().flat_map(|circle| circle.to_fragments()).collect();
+        let lines = self.lines.iter().flat_map(|line| line.to_fragments()).collect();
+        let rectangles = self.rectangles.iter().flat_map(|rectangle| rectangle.to_fragments()).collect();
+        let triangles = self.triangles.iter().flat_map(|triangle| triangle.to_fragments()).collect();
+
+        (circles, lines, rectangles, triangles)
     }
 }
 
@@ -108,6 +77,10 @@ impl LinePrimitive {
             });
         }
 
+        if self.positions.len() == 2 {
+            fragments.get_mut(0).as_mut().unwrap().ty = 3;
+        }
+
         if self.positions.len() == 1 {
             let start = self.positions[self.positions.len() - 1];
 
@@ -139,6 +112,27 @@ impl RectanglePrimitive {
             RectangleFragment {
                 position: self.position,
                 size: self.size,
+                color: self.color
+            }
+        ]        
+    }
+}
+
+#[derive(Debug)]
+pub struct TrianglePrimitive {
+    pub position: Vector2<f32>,
+    pub size: Vector2<f32>,
+    pub dir_vec: Vector2<f32>,
+    pub color: u32,
+}
+
+impl TrianglePrimitive {
+    pub fn to_fragments(&self) -> Vec<TriangleFragment> {
+        vec![
+            TriangleFragment {
+                position: self.position,
+                size: self.size,
+                dir_vec: self.dir_vec,
                 color: self.color
             }
         ]        

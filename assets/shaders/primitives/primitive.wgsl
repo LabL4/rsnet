@@ -7,12 +7,10 @@ struct CameraUniform {
     view_proj: mat4x4<f32>,
     aabb: AaBb,
     radius: f32,
-    // _pad: vec3<f32>,
 };
 
 struct MouseUniform {
     pos: vec2<f32>,
-//    _pad: vec2<f32>,
 };
 
 struct WindowUniform {
@@ -30,27 +28,38 @@ var<uniform> mouse: MouseUniform;
 var<uniform> window: WindowUniform;
 
 @group(1) @binding(0)
-var<storage, read> component_fragments: array<Fragments>;
+var<storage, read> component_ty_fragments: array<ComponentTyFragments>;
+@group(1) @binding(1)
+var<storage, read> circles: array<CircleFragment>;
+@group(1) @binding(2)
+var<storage, read> lines: array<LineFragment>;
+@group(1) @binding(3)
+var<storage, read> rectangles: array<RectangleFragment>;
+@group(1) @binding(4)
+var<storage, read> triangles: array<TriangleFragment>;
 
 @group(2) @binding(0)
 var<storage, read> components: array<Component>;
+
+@group(3) @binding(0)
+var<uniform> fragments_data: FragmentsData;
 
 struct FragmentsData {
     fragments_idx: u32,
 }
 
-@group(3) @binding(0)
-var<uniform> fragments_data: FragmentsData;
-
-struct Fragments {
-    circles: array<CircleFragment, MAX_FRAGMENTS>,
+struct ComponentTyFragments {
+    circles_start: u32,
     n_circles: u32,
-    
-    lines: array<LineFragment, MAX_FRAGMENTS>,
+
+    lines_start: u32,
     n_lines: u32,
-    
-    rectangles: array<RectangleFragment, MAX_FRAGMENTS>,
-    n_rectangles: u32
+
+    rectangles_start: u32,
+    n_rectangles: u32,
+
+    triangles_start: u32,
+    n_triangles: u32,
 }
 
 struct CircleFragment {
@@ -63,13 +72,20 @@ struct LineFragment {
     start: vec2<f32>,
     end: vec2<f32>,
     thickness: f32,
-    ty: u32, // 0 - middle fragment, 1 start fragment, 2 end fragment
+    ty: u32, // 0 - middle fragment, 1 start fragment, 2 end fragment, 3 single fragment
     color: u32,
 };
 
 struct RectangleFragment {
     center: vec2<f32>,
     size: vec2<f32>,
+    color: u32
+}
+
+struct TriangleFragment {
+    center: vec2<f32>,
+    size: vec2<f32>,
+    dir_vec: vec2<f32>,
     color: u32
 }
 
@@ -208,6 +224,41 @@ fn vs_rectangle(vertex_idx: u32, fragment: RectangleFragment) -> VertexOutput {
     return output;
 }
 
+fn vs_triangle(vertex_idx: u32, real_vertex_idx: u32, fragment: TriangleFragment) -> VertexOutput {
+    var output: VertexOutput;
+
+    if (real_vertex_idx > 2u) {
+        // Apparently GPUs understand this magic. It's a way to discard a fragment.
+        output.clip_pos.x = bitcast<f32>(0x7FC00000u); // NaN
+        return output;
+    }
+
+    //   *   // 1
+    //  / \
+    // *---*
+    // 0   2
+
+    let up_bit = vertex_idx & 1u;
+    let right_bit = (vertex_idx >> 1u) & 1u;
+
+    let vertex = vec2<f32>(
+        (f32(right_bit) - 0.5) * 2.0 * (1.0 - f32(up_bit)),
+        (f32(up_bit) - 0.5) * 2.0
+    );
+
+    let dir_normal = vec2<f32>(-fragment.dir_vec.y, fragment.dir_vec.x); // CCW
+    
+    let pos = vertex * fragment.size / 2.0;
+    output.clip_pos = vec4<f32>((pos.x * fragment.dir_vec + pos.y * dir_normal) + fragment.center, 0.0, 1.0);
+
+
+    output.color = rgb_from_u32(fragment.color);
+    output.tex_coords = vertex;
+
+    
+    return output;
+}
+
 @vertex
 fn vs_main(
     // @location(0) component_idx: u32,
@@ -222,36 +273,63 @@ fn vs_main(
     var output: VertexOutput;
 
     let component = components[component_idx];
-    var fragments = component_fragments[fragments_data.fragments_idx];
+    var fragments = component_ty_fragments[fragments_data.fragments_idx];
     let vertex_idx_in_fragment = vertex_idx % 6 - (vertex_idx % 6) / 3u * 2u;
 
-    var idx = 0u;
-    if (fragment_idx >= fragments.n_circles && fragment_idx < fragments.n_circles + fragments.n_lines) {
-        idx = 1u;
-    } else if (fragment_idx >= fragments.n_circles + fragments.n_lines) {
-        idx = 2u;
+    
+    let first_idx = fragments.n_circles + 1u;
+    let second_idx = first_idx + fragments.n_lines;
+    let third_idx = second_idx + fragments.n_rectangles;
+
+
+    let n_desp = 1u - clamp(first_idx, 0u, 1u);
+    let calc_idx = fragment_idx + 1u;
+
+
+    var idx = u32(max(0u,
+        max(
+            clamp(calc_idx / first_idx, 0u, 1u),
+            max(
+                clamp(calc_idx / second_idx, 0u, 1u) * 2u,
+                clamp(calc_idx / third_idx, 0u, 1u) * 3u
+            )
+        )
+    )) ;
+
+    if (fragment_idx == 14u) {
+        idx = 3u;
     }
 
+
     switch idx {
+        case 3u: {
+            var fragment = triangles[ fragments.triangles_start + fragment_idx - fragments.n_rectangles - fragments.n_lines - fragments.n_circles ];
+            output = vs_triangle(vertex_idx_in_fragment, vertex_idx % 6, fragment);
+            if (output.clip_pos.x == bitcast<f32>(0x7FC00000u)) {
+                return output;
+            }
+            output.fragment_ty = 3u;
+        }
         case 2u: {
-            var fragment = fragments.rectangles[fragment_idx - fragments.n_circles - fragments.n_lines];
+            var fragment = rectangles[ fragments.rectangles_start + fragment_idx - fragments.n_lines - fragments.n_circles];
             output = vs_rectangle(vertex_idx_in_fragment, fragment);
             output.fragment_ty = 2u;
+            // output.color = vec4<f32>(1.0, 0.0, f32(fragments.rectangles_start + fragment_idx), 1.0);
         }
         case 1u: {
             let idx = fragment_idx - fragments.n_circles;
             let prev_idx = u32(max(0i, i32(idx) - 1i));
-            let next_idx = min(fragments.n_lines - 1u, idx + 1u);
+            let next_idx = min(arrayLength(&lines) - 1u, idx + 1u);
 
-            var fragment = fragments.lines[idx];
-            var prev_fragment = fragments.lines[prev_idx];
-            var next_fragment = fragments.lines[next_idx];
+            var fragment = lines[fragments.lines_start + idx];
+            var prev_fragment = lines[fragments.lines_start + prev_idx];
+            var next_fragment = lines[fragments.lines_start + next_idx];
 
             output = vs_line(vertex_idx_in_fragment, fragment, prev_fragment, next_fragment);
             output.fragment_ty = 1u;
         }
         case 0u, default {
-            var fragment = fragments.circles[fragment_idx];
+            var fragment = circles[fragments.circles_start + fragment_idx];
             output = vs_circle(vertex_idx_in_fragment, fragment);
             output.fragment_ty = 0u;
         }
@@ -296,17 +374,32 @@ fn fs_rectangle(in: VertexOutput) -> FragmentOutput {
     return output;
 }
 
+fn fs_triangle(in: VertexOutput) -> FragmentOutput {
+    var output: FragmentOutput;
+
+    output.color = in.color;
+
+    return output;
+}
+
 @fragment
 fn fs_main(in: VertexOutput) -> FragmentOutput {
     var output: FragmentOutput;
 
-    if (in.fragment_ty == 0u) {
-        output = fs_circle(in);
-    } else if (in.fragment_ty == 1u) {
-        output = fs_line(in);
-    } else {
-        output = fs_rectangle(in);
-    }
+    switch in.fragment_ty {
+        case 0u: {
+            output = fs_circle(in);
+        }
+        case 1u: {
+            output = fs_line(in);
+        }
+        case 2u: {
+            output = fs_rectangle(in);
+        }
+        case 3u, default: {
+            output = fs_triangle(in);
+        }
+    };
     
     return output;
 }

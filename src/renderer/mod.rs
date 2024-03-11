@@ -7,14 +7,13 @@ use primitives::{
     common::*,
     pipeline::create_primitive_pipeline,
     shared::{FragmentsDataUniform, FragmentsStorage},
-    utils::{attach_empty_fragment_storage, create_fragment_storage_bind_group},
+    utils::{attach_fragment_storage, attach_fragment_data_uniform},
 };
 use shared::*;
 use utils::*;
 
 use crate::{
     app::camera::{Camera, CameraController},
-    renderer::primitives::shared::FragmentsData,
     scene::{
         shared::{ComponentBufferEntry, SceneStorage},
         utils::{chunk_id_from_position, ChunkId, ChunkRange},
@@ -36,8 +35,6 @@ use wgpu::{
     CommandEncoder, Device, Queue, RenderPassColorAttachment, RenderPassDescriptor,
     SurfaceConfiguration, TextureView,
 };
-
-use self::primitives::utils::attach_fragment_data_uniform;
 
 pub struct Shared<'a> {
     pub common_uniforms: CommonUniforms,
@@ -84,19 +81,21 @@ impl<'a> Renderer<'a> {
         );
 
         // This is the scene cache on GPU
-        let mut scene_storage = attach_empty_scene_storage(&device);
+        let scene_storage = attach_empty_scene_storage(&device);
 
-        let mut fragments_storage = attach_empty_fragment_storage(&device);
+        let fragments_storage = attach_fragment_storage(
+            &device,
+            vec![
+                &MEMRISTOR_PRIMITIVES_L0,
+                &MEMRISTOR_PRIMITIVES_L1,
+                &OMP_AMP_PRIMITIVES_L0,
+                &NMOS_PRIMITIVES_L0,
+            ],
+        );
 
         let fragments_data_uniform = attach_fragment_data_uniform(&device);
 
         // let vertex_buffer = attach_vertex_buffer(&device, None);
-
-        fragments_storage.fragments.set(vec![
-            MEMRISTOR_PRIMITIVES_L0.to_fragments(),
-            MEMRISTOR_PRIMITIVES_L1.to_fragments(),
-            OMP_AMP_PRIMITIVES_L1.to_fragments(),
-        ]);
 
         let primitive_pipeline = create_primitive_pipeline(
             &config,
@@ -138,6 +137,7 @@ impl<'a> Renderer<'a> {
             .fragments_index_map
             .insert(0, vec![(0, 400.0), (1, 1200.0)]);
         cache.fragments_index_map.insert(1, vec![(2, 400.0)]);
+        cache.fragments_index_map.insert(2, vec![(3, 400.0)]);
 
         cache.fragments_index_map.iter().for_each(|(ty, _)| {
             cache.last_lod_for_type.insert(*ty, 0);
@@ -219,7 +219,7 @@ impl<'a> Renderer<'a> {
     ) {
         self.check_and_update_common_uniforms(&context.queue, camera_controller);
 
-        self.check_and_update_fragments_storage(&context.device, &context.queue, camera_controller);
+        // self.check_and_update_fragments_storage(&context.device, &context.queue, camera_controller);
 
         self.check_and_update_scene_storage(
             &context.device,
@@ -268,7 +268,6 @@ impl<'a> Renderer<'a> {
             &self.shared.common_uniforms.bind_group,
         );
     }
-    
 
     /// This function checks if the common uniforms have changed, and updates the GPU buffer if they have.
     fn check_and_update_common_uniforms(
@@ -283,43 +282,43 @@ impl<'a> Renderer<'a> {
         }
     }
 
-    fn check_and_update_fragments_storage(
-        &mut self,
-        device: &Device,
-        queue: &Queue,
-        _camera_controller: &CameraController,
-    ) {
-        if self.shared.fragments_storage.fragments.is_dirty() {
-            // println!("n_circles: {}", self.shared.fragments_storage.fragments.get()[0].n_circles);
-            let prev_size = self
-                .shared
-                .fragments_storage
-                .fragments
-                .get_scratch()
-                .as_ref()
-                .len();
-            self.shared
-                .fragments_storage
-                .fragments
-                .write_buffer(device, queue);
+    // fn check_and_update_fragments_storage(
+    //     &mut self,
+    //     device: &Device,
+    //     queue: &Queue,
+    //     _camera_controller: &CameraController,
+    // ) {
+    //     if self.shared.fragments_storage.fragments.is_dirty() {
+    //         // println!("n_circles: {}", self.shared.fragments_storage.fragments.get()[0].n_circles);
+    //         let prev_size = self
+    //             .shared
+    //             .fragments_storage
+    //             .fragments
+    //             .get_scratch()
+    //             .as_ref()
+    //             .len();
+    //         self.shared
+    //             .fragments_storage
+    //             .fragments
+    //             .write_buffer(device, queue);
 
-            if prev_size
-                != self
-                    .shared
-                    .fragments_storage
-                    .fragments
-                    .get_scratch()
-                    .as_ref()
-                    .len()
-            {
-                self.shared.fragments_storage.bind_group = create_fragment_storage_bind_group(
-                    device,
-                    &self.shared.fragments_storage.bind_group_layout,
-                    self.shared.fragments_storage.fragments.buffer().unwrap(),
-                );
-            }
-        }
-    }
+    //         if prev_size
+    //             != self
+    //                 .shared
+    //                 .fragments_storage
+    //                 .fragments
+    //                 .get_scratch()
+    //                 .as_ref()
+    //                 .len()
+    //         {
+    //             self.shared.fragments_storage.bind_group = create_fragment_storage_bind_group(
+    //                 device,
+    //                 &self.shared.fragments_storage.bind_group_layout,
+    //                 self.shared.fragments_storage.fragments.buffer().unwrap(),
+    //             );
+    //         }
+    //     }
+    // }
 
     /// This function checks if the scene has changed, and updates the GPU buffer if it has.
     fn check_and_update_scene_storage(
@@ -358,20 +357,38 @@ impl<'a> Renderer<'a> {
 
             let compute_start_positions = |n_components_by_type: &HashMap<u32, usize>| {
                 let mut acc = 0;
-                let start_positions = n_components_by_type
-                    .iter()
-                    .map(|(ty, n)| {
-                        let start_p = acc;
-                        acc += n;
-                        (*ty, start_p)
-                    })
-                    .collect::<HashMap<u32, usize>>();
+                let mut start_positions = HashMap::<u32, usize>::new();
+                let mut n_comps = 0;
+                let mut i = 0;
+                while n_comps < components.len() {
+                    match n_components_by_type.get(&i) {
+                        Some(n) => {
+                            start_positions.insert(i, acc);
+                            acc += n;
+                            n_comps += n;
+                        }
+                        None => (),
+                    }
+                    i += 1;
+                }
+ 
                 start_positions
             };
 
             let (mut n_aditions, mut n_deletions) = (0, 0);
 
             let start_positions = compute_start_positions(n_components_by_type);
+
+            // check that start_positions is ordered by type
+            // let mut prev_ty = 0;
+            // for (ty, start_p) in start_positions.iter() {
+            //     if *ty < prev_ty {
+            //         info!("start_positions: {:#?}", start_positions);
+            //         panic!("Not ordered by type");
+            //     }
+            //     prev_ty = *ty;
+            // }
+
             // to_remove is a vec of (id, type)
             // let to_remove = Arc::new(Mutex::new(Vec::<(u32, u32)>::new()));
             let to_remove = Arc::new(Mutex::new(HashMap::<u32, u32>::new()));
