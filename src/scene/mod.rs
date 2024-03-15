@@ -13,7 +13,7 @@ use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct Scene {
-        
+    
     components: HashMap<ChunkId, Vec<Component>>,
     id_to_chunk: HashMap<Id, ChunkId>,
 

@@ -5,6 +5,7 @@ use wgpu::{Device, SurfaceConfiguration};
 pub fn create_pipeline(
     config: &SurfaceConfiguration,
     device: &Device,
+    msaa_count: u32,
 ) -> wgpu::RenderPipeline {
 
     let bind_group_layout = common_uniforms_layout(device);
@@ -58,7 +59,7 @@ pub fn create_pipeline(
         },
         depth_stencil: None,
         multisample: wgpu::MultisampleState {
-            count: 1,
+            count: msaa_count,
             mask: !0,
             alpha_to_coverage_enabled: false,
         },

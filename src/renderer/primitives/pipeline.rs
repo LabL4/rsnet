@@ -102,9 +102,26 @@ impl VertexBuffer<'_> {
 //     }
 // }
 
-pub fn create_primitive_pipeline(
+pub fn create_primitive_pipeline(config: &SurfaceConfiguration,
+    device: &Device,
+    msaa_samples: u32,
+    common_uniform_bind_group_layout: &wgpu::BindGroupLayout,
+    fragments_storage_bind_group_layout: &wgpu::BindGroupLayout,
+    scene_storage_bind_group_layout: &wgpu::BindGroupLayout,
+    fragments_data_uniform_bind_group_layout: &wgpu::BindGroupLayout,
+) -> wgpu::RenderPipeline {
+    create_primitive_pipeline_unnamed(config, device, msaa_samples, &[
+        common_uniform_bind_group_layout,
+        fragments_storage_bind_group_layout,
+        scene_storage_bind_group_layout,
+        fragments_data_uniform_bind_group_layout,
+    ])
+}
+
+pub fn create_primitive_pipeline_unnamed(
     config: &SurfaceConfiguration,
     device: &Device,
+    msaa_samples: u32,
     bind_group_layouts: &[&wgpu::BindGroupLayout],
 ) -> wgpu::RenderPipeline {
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -161,24 +178,8 @@ pub fn create_primitive_pipeline(
             stencil: wgpu::StencilState::default(),
             bias: wgpu::DepthBiasState::default(),
         }),
-        // depth_stencil: Some(wgpu::DepthStencilState {
-        //     format: wgpu::TextureFormat::Depth32Float,
-        //     depth_write_enabled: true,
-        //     depth_compare: wgpu::CompareFunction::Less,
-        //     stencil: wgpu::StencilState {
-        //         front: wgpu::StencilFaceState::IGNORE,
-        //         back: wgpu::StencilFaceState::IGNORE,
-        //         read_mask: 0,
-        //         write_mask: 0,
-        //     },
-        //     bias: wgpu::DepthBiasState {
-        //         constant: 0,
-        //         slope_scale: 0.0,
-        //         clamp: 0.0,
-        //     },
-        // }),
         multisample: wgpu::MultisampleState {
-            count: 1,
+            count: msaa_samples,
             mask: !0,
             alpha_to_coverage_enabled: false,
         },

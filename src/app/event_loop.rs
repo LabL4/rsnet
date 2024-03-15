@@ -23,7 +23,7 @@ impl EventLoopWrapper {
         let event_loop = EventLoop::new().unwrap();
         let mut builder = winit::window::WindowBuilder::new();
         builder = builder.with_title(title);
-        builder = builder.with_inner_size(LogicalSize::new(500.0, 500.0));
+        builder = builder.with_inner_size(LogicalSize::new(900.0, 700.0));
         let window = Arc::new(builder.build(&event_loop).unwrap());
 
         #[cfg(arch = "wasm32")]
@@ -80,7 +80,7 @@ pub async fn run() {
 fn event_handler<'a>(window: Arc<Window>, surface: SurfaceWrapper<'a>, context: Context) -> impl FnMut(Event<()>, &EventLoopWindowTarget<()>) -> () + 'a
 {
     
-    let mut frame_counter = FrameCounter::new();
+    // let mut frame_counter = FrameCounter::new();
     
     
     
@@ -137,7 +137,7 @@ fn event_handler<'a>(window: Arc<Window>, surface: SurfaceWrapper<'a>, context: 
                     println!("{:#?}", app.context.instance.generate_report());
                 },
                 WindowEvent::RedrawRequested => {
-                    frame_counter.update();
+                    // frame_counter.update();
 
                     app.render();
 

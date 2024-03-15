@@ -26,9 +26,7 @@ use crate::{
 use egui::ahash::HashSet;
 use rayon::prelude::*;
 use std::{
-    collections::HashMap,
-    marker::PhantomData,
-    sync::{Arc, Mutex},
+    collections::HashMap, marker::PhantomData, primitive, sync::{Arc, Mutex}
 };
 use tracing::{debug, info};
 use wgpu::{
@@ -68,6 +66,7 @@ pub struct Renderer<'a> {
     pub shared: Shared<'a>,
     pub pipelines: Pipelines,
     pub cache: Cache,
+    pub msaa_count: u32,
     phantom: PhantomData<&'a ()>,
 }
 
@@ -79,6 +78,8 @@ impl<'a> Renderer<'a> {
             MouseUniform::default(),
             WindowUniform::default(),
         );
+
+        let msaa_count = 1;
 
         // This is the scene cache on GPU
         let scene_storage = attach_empty_scene_storage(&device);
@@ -98,17 +99,16 @@ impl<'a> Renderer<'a> {
         // let vertex_buffer = attach_vertex_buffer(&device, None);
 
         let primitive_pipeline = create_primitive_pipeline(
-            &config,
-            &device,
-            &[
-                &common_uniforms.bind_group_layout,
-                &fragments_storage.bind_group_layout,
-                &scene_storage.bind_group_layout,
-                &fragments_data_uniform.bind_group_layout,
-            ],
+            config,
+            device,
+            1,
+            &common_uniforms.bind_group_layout,
+            &fragments_storage.bind_group_layout,
+            &scene_storage.bind_group_layout,
+            &fragments_data_uniform.bind_group_layout,
         );
 
-        let grid_effect_pipeline = effects::grid::pipeline::create_pipeline(config, device);
+        let grid_effect_pipeline = effects::grid::pipeline::create_pipeline(config, device, msaa_count);
 
         let pipelines = Pipelines {
             primitive: primitive_pipeline,
@@ -150,8 +150,27 @@ impl<'a> Renderer<'a> {
             shared,
             pipelines,
             cache: cache,
+            msaa_count,
             phantom: PhantomData,
         }
+    }
+
+    pub fn set_msaa_count(&mut self, count: u32) {
+        self.msaa_count = count;
+    }
+
+    pub fn rebuild_pipelines(&mut self, config: &SurfaceConfiguration, device: &Device) {
+        self.pipelines.primitive = create_primitive_pipeline(
+            config,
+            device,
+            self.msaa_count,
+            &self.shared.common_uniforms.bind_group_layout,
+            &self.shared.fragments_storage.bind_group_layout,
+            &self.shared.scene_storage.bind_group_layout,
+            &self.shared.fragments_data_uniform_map[&0].bind_group_layout,
+        );
+
+        self.pipelines.grid_effect = effects::grid::pipeline::create_pipeline(config, device, self.msaa_count);
     }
 
     pub fn update_camera(&mut self, camera: &Camera, queue: &Queue) {
@@ -211,6 +230,7 @@ impl<'a> Renderer<'a> {
 
     pub fn render(
         &mut self,
+        ms_view: Option<&TextureView>,
         view: &TextureView,
         context: &Context,
         encoder: &mut CommandEncoder,
@@ -231,8 +251,8 @@ impl<'a> Renderer<'a> {
         let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
             label: Some("Render Pass"),
             color_attachments: &[Some(RenderPassColorAttachment {
-                view: view,
-                resolve_target: None,
+                view: if ms_view.is_some() { &ms_view.unwrap() } else { view },
+                resolve_target: if ms_view.is_some() { Some(view) } else { None },
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(wgpu::Color {
                         r: 0.7,

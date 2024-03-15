@@ -1,27 +1,36 @@
-use crate::app::State;
+mod settings;
+mod top_panel;
+mod debug_gui;
+
+use crate::{app, gui};
 
 use egui::RichText;
 use egui::{Color32, Context};
 
-pub fn build(context: &Context, state: &mut State) {
-    if !state.ui.is_style_applied {
+use self::settings::Settings;
+use self::top_panel::TopPanel;
+
+use super::state::{widget, WidgetId};
+
+pub fn build(context: &Context, app_state: &mut app::State, ui_state: &mut gui::State) {
+    if !ui_state.is_style_applied {
         context.set_style(style());
-        state.ui.is_style_applied = true;
+        ui_state.is_style_applied = true;
     }
 
-    egui::Window::new("Controls")
-        .collapsible(false)
-        .show(context, |ui| {
-            let btn = egui::Button::new(
-                RichText::new("Reset scene")
-                .color(Color32::WHITE)
-                .size(20.0)
-                // .family("")
-            );
-            if ui.add(btn.fill(Color32::from_rgb((252.0*0.8) as u8, (186.0*0.8) as u8, 3))).clicked() {
-               
-            }
-        });
+    // egui::Window::new("Settings")
+    //     .collapsible(false)
+    //     .show(context, |ui| {
+    //         widget::<Settings>(app_state, ui_state, ui, WidgetId::new("Settings"));
+    //     });
+
+    widget::<TopPanel>(
+        app_state,
+        ui_state,
+        None,
+        Some(context),
+        WidgetId::new("Top Panel"),
+    );
 }
 
 pub fn style() -> egui::Style {

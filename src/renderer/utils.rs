@@ -370,7 +370,7 @@ pub fn create_depth_texture(device: &wgpu::Device, config: &wgpu::SurfaceConfigu
         label: Some(label),
         size,
         mip_level_count: 1,
-        sample_count: 1,
+        sample_count: 4,
         dimension: wgpu::TextureDimension::D2,
         format: wgpu::TextureFormat::Depth32Float,
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT // 3.

@@ -53,7 +53,7 @@ pub fn render_primitives<'b, 'c>(
             &[],
         );
 
-        info!("Rendering {} fragments for type {} for {} components", n_fragments, ty, n_components);
+        // info!("Rendering {} fragments for type {} for {} components", n_fragments, ty, n_components);
 
         render_pass.draw(
             0..(n_fragments * 6),

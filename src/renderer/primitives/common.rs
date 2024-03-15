@@ -68,13 +68,16 @@ lazy_static!(
                     positions: central_line,
                     thickness: LINE_THICKNESS,
                     // color: 0xF5A142
-                    color: 0x000000
+                    color: 0x000000,
+                    line_cap_ty: 0
                 },
                 LinePrimitive {
                     positions: outline,
                     thickness: LINE_THICKNESS,
                     // color: 0xF5A142
-                    color: 0x000000
+                    color: 0x000000,
+                    line_cap_ty: 0
+
                 }
             ],
             rectangles: vec![
@@ -107,8 +110,12 @@ lazy_static!(
     
     pub static ref OMP_AMP_PRIMITIVES_L0: ComponentTyPrimitives = {
         
-        const OPAMP_WIDTH: f32 = 1.0;
-        const OPAMP_HEIGHT: f32 = 1.0;
+        const OPAMP_WIDTH: f32 = 0.65;
+        const OPAMP_HEIGHT: f32 = 0.8;
+        const SYMBOLS_DESPL: f32 = 0.11;
+        const SYMBOLS_SIZE: f32 = 0.1;
+        const SYMBOLS_THICKNESS: f32 = 0.02;
+        const TERMINAL_LEN: f32 = 0.2;
 
         let mut outline: Vec<Vector2<f32>> = vec![];
         outline.push(Vector2::new(-OPAMP_WIDTH / 2.0, 0.0));
@@ -117,16 +124,70 @@ lazy_static!(
         outline.push(Vector2::new(-OPAMP_WIDTH / 2.0, -OPAMP_HEIGHT / 2.0));
         outline.push(Vector2::new(-OPAMP_WIDTH / 2.0, 0.0));
 
+        let plus_sign_center = Vector2::new(-OPAMP_WIDTH / 2.0 + SYMBOLS_DESPL, 0.45 * -OPAMP_HEIGHT/2.0);
+        let minus_sign_center = Vector2::new(-OPAMP_WIDTH / 2.0 + SYMBOLS_DESPL, 0.45 * OPAMP_HEIGHT/2.0);
+
+        let minus_terminal = vec![
+            Vector2::new(-OPAMP_WIDTH / 2.0, minus_sign_center.y),
+            Vector2::new(-OPAMP_WIDTH / 2.0 - TERMINAL_LEN, minus_sign_center.y)
+        ];
+
+        let plus_terminal = vec![
+            Vector2::new(-OPAMP_WIDTH / 2.0, plus_sign_center.y),
+            Vector2::new(-OPAMP_WIDTH / 2.0 - TERMINAL_LEN, plus_sign_center.y)
+        ];
+
+        let out_terminal = vec![
+            Vector2::new(OPAMP_WIDTH / 2.0, 0.0),
+            Vector2::new(OPAMP_WIDTH / 2.0 + TERMINAL_LEN, 0.0)
+        ];
+
+
         ComponentTyPrimitives {
             circles: vec![],
             lines: vec![
                 LinePrimitive {
                     positions: outline,
                     thickness: LINE_THICKNESS,
+                    color: 0x000000,
+                    line_cap_ty: 1
+                },
+                LinePrimitive {
+                    positions: plus_terminal,
+                    thickness: LINE_THICKNESS,
+                    color: 0x000000,
+                    line_cap_ty: 0
+                },
+                LinePrimitive {
+                    positions: minus_terminal,
+                    thickness: LINE_THICKNESS,
+                    color: 0x000000,
+                    line_cap_ty: 0
+                },
+                LinePrimitive {
+                    positions: out_terminal,
+                    thickness: LINE_THICKNESS,
+                    color: 0x000000,
+                    line_cap_ty: 0
+                }
+            ],
+            rectangles: vec![
+                RectanglePrimitive {
+                    position: plus_sign_center,
+                    size: Vector2::new(SYMBOLS_SIZE, SYMBOLS_THICKNESS),
+                    color: 0x000000
+                },
+                RectanglePrimitive {
+                    position: plus_sign_center,
+                    size: Vector2::new(SYMBOLS_THICKNESS, SYMBOLS_SIZE),
+                    color: 0x000000
+                },
+                RectanglePrimitive {
+                    position: minus_sign_center,
+                    size: Vector2::new(SYMBOLS_SIZE, SYMBOLS_THICKNESS),
                     color: 0x000000
                 }
             ],
-            rectangles: vec![],
             triangles: vec![]
         }
     };
@@ -164,17 +225,20 @@ lazy_static!(
                 LinePrimitive {
                     positions: gate_line.clone(),
                     thickness: LINE_THICKNESS*0.8,
-                    color: 0x000000
+                    color: 0x000000,
+                    line_cap_ty: 0
                 },
                 LinePrimitive {
                     positions: drain_line,
                     thickness: LINE_THICKNESS*0.8,
-                    color: 0x000000
+                    color: 0x000000,
+                    line_cap_ty: 0
                 },
                 LinePrimitive {
                     positions: source_line,
                     thickness: LINE_THICKNESS*0.8,
-                    color: 0x000000
+                    color: 0x000000,
+                    line_cap_ty: 0
                 }
             ],
             rectangles: vec![

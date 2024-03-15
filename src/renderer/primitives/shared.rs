@@ -19,6 +19,7 @@ pub struct LineFragment {
     pub thickness: f32,
     /// 0 mid, 1 start, 2 end, 3 start and end
     pub ty: u32,
+    pub line_cap_ty: u32,
     pub color: u32
 }
 

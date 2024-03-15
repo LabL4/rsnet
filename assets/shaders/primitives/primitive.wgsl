@@ -72,7 +72,8 @@ struct LineFragment {
     start: vec2<f32>,
     end: vec2<f32>,
     thickness: f32,
-    ty: u32, // 0 - middle fragment, 1 start fragment, 2 end fragment, 3 single fragment
+    ty: u32, // 0 - middle fragment, 1 start fragment, 2 end fragment, 3 single fragment,
+    line_cap_ty: u32,
     color: u32,
 };
 
@@ -169,25 +170,64 @@ fn vs_line(vertex_idx: u32, fragment: LineFragment, prev_fragment: LineFragment,
     output.tex_coords = vertex;
 
     var selected_normal: vec2<f32>;
+
     
-    if (right_bit == 1u && (fragment.ty == 1u || fragment.ty == 0u)) {
+    
+    if (right_bit == 1u && (fragment.ty == 1u || fragment.ty == 0u)) { // start fragment (cap at end)
         let next_fragment_dir = normalize(next_fragment.end - next_fragment.start);
         let next_normal = vec2<f32>(-next_fragment_dir.y, next_fragment_dir.x);
-        let intersection_vec_norm = normalize(normal + next_normal);
-        let cos_theta = dot(intersection_vec_norm, normal);
-        let intersection_vec = 1.0 / cos_theta * intersection_vec_norm;
+        
+        switch fragment.line_cap_ty {
+            case 1u: {
+                let v = normalize(dir + next_fragment_dir);
 
-        selected_normal = intersection_vec;
+                let cos_phi = dot(dir, next_normal);
+                let l = fragment.thickness / 2.0 / abs(cos_phi);
 
-    } else if (right_bit == 0u && (fragment.ty == 2u || fragment.ty == 0u)) {
+                let cos_theta = dot(dir, v);
+
+                let l2 = l * cos_theta * 2.0;
+
+                selected_normal = -v * l2 * (2.0 / fragment.thickness);
+            }
+            case 0u, default: {
+                let intersection_vec_norm = normalize(normal + next_normal);
+                let cos_theta = dot(intersection_vec_norm, normal);
+                let intersection_vec = 1.0 / cos_theta * intersection_vec_norm;
+
+                selected_normal = intersection_vec;
+            }
+        }
+        
+
+    } else if (right_bit == 0u && (fragment.ty == 2u || fragment.ty == 0u)) { // end fragment (cap at start)
         let prev_fragment_dir = normalize(prev_fragment.end - prev_fragment.start);
         let prev_normal = vec2<f32>(-prev_fragment_dir.y, prev_fragment_dir.x);
         // let intersection_vec = normal + prev_normal;
-        let intersection_vec_norm = normalize(normal + prev_normal);
-        let cos_theta = dot(intersection_vec_norm, normal);
-        let intersection_vec = 1.0 / cos_theta * intersection_vec_norm;
+        
 
-        selected_normal = intersection_vec;
+        switch fragment.line_cap_ty {
+            case 1u: {
+                let v = normalize(dir + prev_fragment_dir);
+
+                let cos_phi = dot(dir, prev_normal);
+                let l = fragment.thickness / 2.0 / abs(cos_phi);
+
+                let cos_theta = dot(dir, v);
+
+                let l2 = l * cos_theta * 2.0;
+
+                selected_normal = v * l2 * (2.0 / fragment.thickness );
+            }
+            case 0u, default: {
+                let intersection_vec_norm = normalize(normal + prev_normal);
+                let cos_theta = dot(intersection_vec_norm, normal);
+                let intersection_vec = 1.0 / cos_theta * intersection_vec_norm;
+
+                selected_normal = intersection_vec;
+            }
+        }
+
     } else {
         selected_normal = normal;
     }

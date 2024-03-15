@@ -56,6 +56,7 @@ impl CirclePrimitive {
 #[derive(Debug)]
 pub struct LinePrimitive {
     pub positions: Vec<Vector2<f32>>,
+    pub line_cap_ty: u32,
     pub thickness: f32,
     pub color: u32
 }
@@ -72,6 +73,7 @@ impl LinePrimitive {
                 start,
                 end,
                 thickness: self.thickness,
+                line_cap_ty: self.line_cap_ty,
                 ty: if i == 0 { 1 } else if i == self.positions.len() - 2 { 2 } else { 0 },
                 color: self.color
             });
@@ -88,6 +90,7 @@ impl LinePrimitive {
                 start,
                 end: start,
                 thickness: self.thickness,
+                line_cap_ty: self.line_cap_ty,
                 ty: 3,
                 color: self.color
             });

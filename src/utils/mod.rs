@@ -1,6 +1,8 @@
 pub mod frame_counter;
 pub mod wgpu;
 
+pub use frame_counter::FrameCounter;
+
 use nalgebra::Vector2;
 use rayon::prelude::*;
 use std::{collections::HashMap, fmt::Debug};
