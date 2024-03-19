@@ -2,12 +2,13 @@ pub mod effects;
 pub mod primitives;
 pub mod shared;
 pub mod utils;
+pub mod wires;
 
 use primitives::{
     common::*,
     pipeline::create_primitive_pipeline,
     shared::{FragmentsDataUniform, FragmentsStorage},
-    utils::{attach_fragment_storage, attach_fragment_data_uniform},
+    utils::{attach_fragment_data_uniform, attach_fragment_storage},
 };
 use shared::*;
 use utils::*;
@@ -15,18 +16,24 @@ use utils::*;
 use crate::{
     app::camera::{Camera, CameraController},
     scene::{
-        shared::{ComponentBufferEntry, SceneStorage},
-        utils::{chunk_id_from_position, ChunkId, ChunkRange},
+        self,
+        shared::{
+            attach_empty_scene_storage, create_scene_storage_bind_group, ComponentBufferEntry,
+            SceneStorage, WireSegmentBufferEntry,
+        },
+        utils::{chunk_id_from_position, ChunkId, ChunkRange, ChunkSize},
         Scene,
     },
     timed,
     utils::{insert_ordered_at, wgpu::context::Context, WindowSize},
 };
 
-use egui::ahash::HashSet;
 use rayon::prelude::*;
 use std::{
-    collections::HashMap, marker::PhantomData, primitive, sync::{Arc, Mutex}
+    collections::{HashMap, HashSet},
+    marker::PhantomData,
+    primitive,
+    sync::{Arc, Mutex},
 };
 use tracing::{debug, info};
 use wgpu::{
@@ -35,6 +42,8 @@ use wgpu::{
 };
 
 pub struct Shared<'a> {
+    pub chunk_data_uniform: ChunkDataUniform,
+    pub time_uniform: TimeUniform,
     pub common_uniforms: CommonUniforms,
     pub scene_storage: SceneStorage,
     pub fragments_storage: FragmentsStorage,
@@ -47,18 +56,21 @@ pub struct Shared<'a> {
 pub struct Pipelines {
     primitive: wgpu::RenderPipeline,
     grid_effect: wgpu::RenderPipeline,
+    wires: wgpu::RenderPipeline,
 }
 
 #[derive(Debug, Default)]
 pub struct Cache {
     /// This is a cache of the number of components in the scene, batched by type.
     pub n_components_by_type: HashMap<u32, usize>,
-    pub visible_chunks: HashSet<ChunkId>,
-    pub chunk_range: ChunkRange,
+    pub chunk_range: Option<ChunkRange>,
     // Maps a componet type to an array of indices in fragments storage buffer,
     // each index in the array corresponds to a Level of detail, being 0 the highest
     pub fragments_index_map: HashMap<u32, Vec<(u32, f32 /*This is the maximum camera distance*/)>>,
     pub last_lod_for_type: HashMap<u32, u32>,
+
+    //
+    pub scene_chunk_step_idx: u32,
 }
 
 pub struct Renderer<'a> {
@@ -67,11 +79,24 @@ pub struct Renderer<'a> {
     pub pipelines: Pipelines,
     pub cache: Cache,
     pub msaa_count: u32,
+    time: u32,
+    last_rendered: std::time::Instant,
     phantom: PhantomData<&'a ()>,
 }
 
 impl<'a> Renderer<'a> {
     pub fn new(config: &SurfaceConfiguration, device: &Device) -> Self {
+        let chunk_data_uniform = attach_chunk_data_uniform(
+            device,
+            ChunkData {
+                prev_chunk_size: 1.0,
+                chunk_size: 1.0,
+                last_chunk_size_update: 0,
+            },
+        );
+
+        let time_uniform = attach_time_data_uniform(device, 0);
+
         let common_uniforms = attach_common_uniforms(
             &device,
             CameraUniform::new(),
@@ -108,10 +133,20 @@ impl<'a> Renderer<'a> {
             &fragments_data_uniform.bind_group_layout,
         );
 
-        let grid_effect_pipeline = effects::grid::pipeline::create_pipeline(config, device, msaa_count);
+        let grid_effect_pipeline =
+            effects::grid::pipeline::create_pipeline(config, device, msaa_count);
+
+        let wires_pipeline = wires::pipeline::create_pipeline(
+            config,
+            device,
+            msaa_count,
+            &common_uniforms.bind_group_layout,
+            &scene_storage.bind_group_layout,
+        );
 
         let pipelines = Pipelines {
             primitive: primitive_pipeline,
+            wires: wires_pipeline,
             grid_effect: grid_effect_pipeline,
         };
 
@@ -119,6 +154,8 @@ impl<'a> Renderer<'a> {
         fragments_data_uniform_map.insert(0, fragments_data_uniform);
 
         let shared = Shared {
+            chunk_data_uniform,
+            time_uniform,
             common_uniforms,
             scene_storage,
             fragments_storage,
@@ -128,10 +165,6 @@ impl<'a> Renderer<'a> {
         };
 
         let mut cache = Cache::default();
-        cache.chunk_range = ChunkRange {
-            min_chunk: (-100, -100),
-            max_chunk: (-100, -100),
-        };
 
         cache
             .fragments_index_map
@@ -151,6 +184,8 @@ impl<'a> Renderer<'a> {
             pipelines,
             cache: cache,
             msaa_count,
+            time: 0,
+            last_rendered: std::time::Instant::now(),
             phantom: PhantomData,
         }
     }
@@ -170,7 +205,8 @@ impl<'a> Renderer<'a> {
             &self.shared.fragments_data_uniform_map[&0].bind_group_layout,
         );
 
-        self.pipelines.grid_effect = effects::grid::pipeline::create_pipeline(config, device, self.msaa_count);
+        self.pipelines.grid_effect =
+            effects::grid::pipeline::create_pipeline(config, device, self.msaa_count);
     }
 
     pub fn update_camera(&mut self, camera: &Camera, queue: &Queue) {
@@ -237,6 +273,15 @@ impl<'a> Renderer<'a> {
         camera_controller: &mut CameraController,
         scene: &Scene,
     ) {
+        let t = std::time::Instant::now();
+        let elapsed = t.duration_since(self.last_rendered);
+
+        self.time += (elapsed.as_millis() as u32).clamp(0, 20);
+
+        self.check_and_update_time_uniform(&context.queue);
+
+        self.check_and_update_chunk_data_uniform(&context.queue, camera_controller);
+
         self.check_and_update_common_uniforms(&context.queue, camera_controller);
 
         // self.check_and_update_fragments_storage(&context.device, &context.queue, camera_controller);
@@ -251,7 +296,11 @@ impl<'a> Renderer<'a> {
         let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
             label: Some("Render Pass"),
             color_attachments: &[Some(RenderPassColorAttachment {
-                view: if ms_view.is_some() { &ms_view.unwrap() } else { view },
+                view: if ms_view.is_some() {
+                    &ms_view.unwrap()
+                } else {
+                    view
+                },
                 resolve_target: if ms_view.is_some() { Some(view) } else { None },
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(wgpu::Color {
@@ -274,6 +323,8 @@ impl<'a> Renderer<'a> {
             &mut render_pass,
             &self.pipelines.grid_effect,
             &self.shared.common_uniforms.bind_group,
+            &self.shared.time_uniform.bind_group,
+            &self.shared.chunk_data_uniform.bind_group,
         );
 
         primitives::render::render_primitives(
@@ -287,6 +338,71 @@ impl<'a> Renderer<'a> {
             &self.shared.scene_storage.bind_group,
             &self.shared.common_uniforms.bind_group,
         );
+
+        self.last_rendered = t;
+    }
+
+    fn check_and_update_chunk_data_uniform(
+        &mut self,
+        queue: &Queue,
+        camera_controller: &CameraController,
+    ) {
+        let actual_chunk_size = camera_controller.chunk_size;
+        let chunk_size = self
+            .shared
+            .chunk_data_uniform
+            .uniform_buffer_data
+            .get()
+            .chunk_size;
+        // info!("Actual chunk size {:#?}, shared: {:#?}", actual_chunk_size, chunk_size);
+
+        // panic!();
+
+        if chunk_size != actual_chunk_size {
+            self.shared
+                .chunk_data_uniform
+                .uniform_buffer_data
+                .set(ChunkData {
+                    prev_chunk_size: chunk_size,
+                    chunk_size: actual_chunk_size,
+                    last_chunk_size_update: self.time,
+                });
+
+            queue.write_buffer(
+                &self.shared.chunk_data_uniform.uniform_buffer_data.buffer(),
+                0,
+                self.shared
+                    .chunk_data_uniform
+                    .uniform_buffer_data
+                    .encase_buffer
+                    .as_ref(),
+            );
+            // panic!("Chunk size updated");
+        } else {
+            // panic!("Chunk size is the same");
+        }
+    }
+
+    fn check_and_update_time_uniform(&mut self, queue: &Queue) {
+        let actual_time = self.time;
+        let time = self.shared.time_uniform.uniform_buffer_data.get().time;
+
+        if time != actual_time {
+            self.shared
+                .time_uniform
+                .uniform_buffer_data
+                .set(TimeData { time: actual_time });
+
+            queue.write_buffer(
+                &self.shared.time_uniform.uniform_buffer_data.buffer(),
+                0,
+                self.shared
+                    .time_uniform
+                    .uniform_buffer_data
+                    .encase_buffer
+                    .as_ref(),
+            );
+        }
     }
 
     /// This function checks if the common uniforms have changed, and updates the GPU buffer if they have.
@@ -348,31 +464,43 @@ impl<'a> Renderer<'a> {
         camera_controller: &CameraController,
         scene: &Scene,
     ) {
+        let chunk_size = camera_controller.chunk_size;
         // let half_chunk_size = scene.chunk_size() / 2.0;
 
         // debug!("Camera AABB: {:?}", camera_controller.screen_world_aabb);
         // debug!("Half chunk size: {}", half_chunk_size);
         let min_chunk =
-            chunk_id_from_position(&camera_controller.screen_world_aabb.min, scene.chunk_size());
+            chunk_id_from_position(&camera_controller.screen_world_aabb.min, chunk_size);
         let max_chunk =
-            chunk_id_from_position(&camera_controller.screen_world_aabb.max, scene.chunk_size());
+            chunk_id_from_position(&camera_controller.screen_world_aabb.max, chunk_size);
 
         let actual_chunk_range = ChunkRange {
             min_chunk,
             max_chunk,
         };
 
-        if self.cache.chunk_range != actual_chunk_range {
+        if self.cache.scene_chunk_step_idx != camera_controller.chunk_step_idx as u32 {
+            self.cache.scene_chunk_step_idx = camera_controller.chunk_step_idx as u32;
+            self.clear_scene_storage(&device, &queue);
+        }
+
+        if self.cache.chunk_range.is_none() || self.cache.chunk_range.as_ref().unwrap() != &actual_chunk_range
+        {
+
+            let chunk_step_idx = self.cache.scene_chunk_step_idx;
+
             // debug!("Visible chunks changed, updating components, ({}, {}), ({}, {})", min_chunk.0, min_chunk.1, max_chunk.0, max_chunk.1);
+            let scene_components = scene.components().get(&(chunk_step_idx as u32));
+            let scene_wire_segments = scene.wire_segments().get(&(chunk_step_idx as u32));
 
             let mut components = self.shared.scene_storage.components.get_mut();
+            let mut wire_segments = self.shared.scene_storage.wire_segments.get_mut();
             let n_components_by_type = &mut self.cache.n_components_by_type;
 
-            let chunk_range = &mut self.cache.chunk_range;
-
-            let (in_self_not_other, in_other_not_self) = timed! {
-                chunk_range.diff(&actual_chunk_range),
-                "Diffing"
+            let (in_self_not_other, in_other_not_self) = if let Some(chunk_range) = self.cache.chunk_range.as_ref() {
+                chunk_range.diff(&actual_chunk_range)
+            } else {
+                (Vec::new(), actual_chunk_range.clone().into_iter().collect())
             };
 
             let compute_start_positions = |n_components_by_type: &HashMap<u32, usize>| {
@@ -391,7 +519,7 @@ impl<'a> Renderer<'a> {
                     }
                     i += 1;
                 }
- 
+
                 start_positions
             };
 
@@ -399,28 +527,17 @@ impl<'a> Renderer<'a> {
 
             let start_positions = compute_start_positions(n_components_by_type);
 
-            // check that start_positions is ordered by type
-            // let mut prev_ty = 0;
-            // for (ty, start_p) in start_positions.iter() {
-            //     if *ty < prev_ty {
-            //         info!("start_positions: {:#?}", start_positions);
-            //         panic!("Not ordered by type");
-            //     }
-            //     prev_ty = *ty;
-            // }
-
             // to_remove is a vec of (id, type)
             // let to_remove = Arc::new(Mutex::new(Vec::<(u32, u32)>::new()));
-            let to_remove = Arc::new(Mutex::new(HashMap::<u32, u32>::new()));
-            timed!(
-                {
-                    // To delete
-                    in_self_not_other.iter().for_each(|chunk_id| {
-                        if components.len() == 0 {
-                            return;
-                        }
+            let components_to_remove = Arc::new(Mutex::new(HashMap::<u32, u32>::new()));
+            let wire_segments_to_remove = Arc::new(Mutex::new(HashSet::<u32>::new()));
+            {
+                // To delete
+                in_self_not_other.iter().for_each(|chunk_id| {
+                    if components.len() > 0 && scene_components.is_some() {
+                        let scene_components = scene_components.unwrap();
 
-                        if let Some(chunk) = scene.components().get(&chunk_id) {
+                        if let Some(chunk) = scene_components.get(&chunk_id) {
                             chunk.par_iter().for_each(|component| {
                                 let start_p = start_positions.get(&component.ty()).unwrap_or(&0);
                                 let n_components =
@@ -439,46 +556,65 @@ impl<'a> Renderer<'a> {
                                         .cmp(&component.ty())
                                         .then(c.id().cmp(&component.id()))
                                 }) {
-                                    to_remove
+                                    components_to_remove
                                         .lock()
                                         .unwrap()
                                         .insert(component.id(), component.ty());
                                 }
                             });
                         }
+                    }
+
+                    if wire_segments.len() > 0 && scene_wire_segments.is_some() {
+                        let scene_wires = scene_wire_segments.unwrap();
+                        if let Some(chunk) = scene_wires.get(&chunk_id) {
+                            chunk.par_iter().for_each(|wire_segment| {
+                                // insert ordered by id
+                                if let Ok(_idx) = wire_segments
+                                    .binary_search_by(|c| c.id().cmp(&wire_segment.id()))
+                                {
+                                    wire_segments_to_remove
+                                        .lock()
+                                        .unwrap()
+                                        .insert(wire_segment.id());
+                                }
+                            });
+                        }
+                    }
+
+                    // if let Some(chunk) =
+                });
+                let components_to_remove = components_to_remove.lock().unwrap().clone();
+
+                components_to_remove.iter().for_each(|(_id, ty)| {
+                    n_components_by_type.get_mut(ty).map(|n| {
+                        *n -= 1;
+                        n_deletions += 1;
                     });
-                    let to_remove = to_remove.lock().unwrap().clone();
+                });
 
-                    to_remove.iter().for_each(|(_id, ty)| {
-                        n_components_by_type.get_mut(ty).map(|n| {
-                            *n -= 1;
-                            n_deletions += 1;
-                        });
-                    });
+                components.retain(|comp| !components_to_remove.contains_key(&comp.id()));
 
-                    components.retain(|comp| !to_remove.contains_key(&comp.id()));
-                },
-                "Deleting components"
-            );
-
-            // Check if components is sorted by type
-            let mut prev_ty = 0;
-            for comp in components.iter() {
-                if comp.ty < prev_ty || comp.id() == 0 {
-                    info!("components: {:#?}", components);
-                    panic!("Not sorted by type after removing components");
-                }
-                prev_ty = comp.ty;
+                let wire_segments_to_remove = wire_segments_to_remove.lock().unwrap().clone();
+                wire_segments.retain(|wire| !wire_segments_to_remove.contains(&wire.id()));
             }
 
             // Where to insert and the components to insert
-            let to_insert = Arc::new(Mutex::new(Some(
-                HashMap::<usize, Vec<ComponentBufferEntry>>::new(),
-            )));
-            timed!(
-                {
-                    in_other_not_self.iter().for_each(|chunk_id| {
-                        if let Some(chunk) = scene.components().get(&chunk_id) {
+            let components_to_insert = Arc::new(Mutex::new(Some(HashMap::<
+                usize,
+                Vec<ComponentBufferEntry>,
+            >::new())));
+            let mut wire_segments_to_insert = Arc::new(Mutex::new(Some(HashMap::<
+                usize,
+                Vec<WireSegmentBufferEntry>,
+            >::new())));
+            {
+                in_other_not_self.iter().for_each(|chunk_id| {
+                    if scene_components.is_some() {
+                        let scene_components = scene_components.unwrap();
+
+                        if let Some(chunk) = scene_components.get(&chunk_id) {
+
                             chunk.par_iter().for_each(|component| {
                                 // insert ordered by type chained with id
                                 if let Err(i) = components.binary_search_by(|a| {
@@ -486,7 +622,7 @@ impl<'a> Renderer<'a> {
                                         .cmp(&component.ty())
                                         .then(a.id().cmp(&component.id()))
                                 }) {
-                                    let mut to_insert = to_insert.lock().unwrap();
+                                    let mut to_insert = components_to_insert.lock().unwrap();
 
                                     // to_insert.entry(i).or_insert(Vec::new());
                                     // let entry = to_insert.get_mut(&i).unwrap();
@@ -494,10 +630,10 @@ impl<'a> Renderer<'a> {
                                         to_insert.as_mut().unwrap().entry(i).or_insert(Vec::new());
 
                                     // Insert in entry ordered by type chained with id
-                                    if let Err(j) = entry.binary_search_by(|a| {
-                                        a.ty()
+                                    if let Err(j) = entry.binary_search_by(|c| {
+                                        c.ty()
                                             .cmp(&component.ty())
-                                            .then(a.id().cmp(&component.id()))
+                                            .then(c.id().cmp(&component.id()))
                                     }) {
                                         entry.insert(
                                             j,
@@ -507,62 +643,120 @@ impl<'a> Renderer<'a> {
                                 }
                             });
                         }
+                    }
+
+                    if scene_wire_segments.is_some() {
+                        let scene_wire_segments = scene_wire_segments.unwrap();
+
+                        if let Some(chunk) = scene_wire_segments.get(&chunk_id) {
+                            chunk.par_iter().for_each(|wire_segment| {
+                                // insert ordered by type chained with id
+                                if let Err(i) = wire_segments
+                                    .binary_search_by(|ws| ws.id().cmp(&wire_segment.id()))
+                                {
+                                    let mut to_insert = wire_segments_to_insert.lock().unwrap();
+
+                                    // to_insert.entry(i).or_insert(Vec::new());
+                                    // let entry = to_insert.get_mut(&i).unwrap();
+                                    let entry =
+                                        to_insert.as_mut().unwrap().entry(i).or_insert(Vec::new());
+
+                                    // Insert in entry ordered by type chained with id
+                                    if let Err(j) =
+                                        entry.binary_search_by(|ws| ws.id().cmp(&wire_segment.id()))
+                                    {
+                                        entry.insert(
+                                            j,
+                                            WireSegmentBufferEntry::from_wire_segment(wire_segment),
+                                        );
+                                    }
+                                }
+                            });
+                        }
+                    }
+                });
+
+                let to_insert = components_to_insert.lock().unwrap().take().unwrap();
+
+                to_insert.iter().for_each(|(_idx, comps)| {
+                    comps.iter().for_each(|c| {
+                        n_components_by_type
+                            .entry(c.ty)
+                            .and_modify(|n| *n += 1)
+                            .or_insert(1);
+                        n_aditions += 1;
                     });
+                });
+                timed!(
+                    insert_ordered_at(&mut components, to_insert),
+                    "insert_ordered_at"
+                );
 
-                    let to_insert = to_insert.lock().unwrap().take().unwrap();
+                let to_insert = wire_segments_to_insert.lock().unwrap().take().unwrap();
+                insert_ordered_at(&mut wire_segments, to_insert);
+            }
 
-                    to_insert.iter().for_each(|(_idx, comps)| {
-                        comps.iter().for_each(|c| {
-                            n_components_by_type
-                                .entry(c.ty)
-                                .and_modify(|n| *n += 1)
-                                .or_insert(1);
-                            n_aditions += 1;
-                        });
-                    });
-                    timed!(
-                        insert_ordered_at(&mut components, to_insert),
-                        "insert_ordered_at"
-                    )
-                },
-                "Adding components"
-            );
+            self.cache.chunk_range = Some(actual_chunk_range);
 
-            self.cache.chunk_range = actual_chunk_range;
+            if n_aditions + n_deletions > 0 {
+                // self.shared.scene_storage.components.set(components.clone());
+                let prev_size = self
+                    .shared
+                    .scene_storage
+                    .components
+                    .get_scratch()
+                    .as_ref()
+                    .len();
 
-            timed!(
-                if n_aditions + n_deletions > 0 {
-                    // self.shared.scene_storage.components.set(components.clone());
-                    let prev_size = self
+                self.shared
+                    .scene_storage
+                    .components
+                    .write_buffer(device, queue);
+                if prev_size
+                    != self
                         .shared
                         .scene_storage
                         .components
                         .get_scratch()
                         .as_ref()
-                        .len();
-                    self.shared
-                        .scene_storage
-                        .components
-                        .write_buffer(device, queue);
-                    if prev_size
-                        != self
-                            .shared
-                            .scene_storage
-                            .components
-                            .get_scratch()
-                            .as_ref()
-                            .len()
-                    {
-                        //prev_size != self.shared.scene_storage.components.get_scratch().as_ref().len() {
-                        self.shared.scene_storage.bind_group = create_scene_storage_bind_group(
-                            device,
-                            &self.shared.scene_storage.bind_group_layout,
-                            self.shared.scene_storage.components.buffer().unwrap(),
-                        );
-                    }
-                },
-                "Writing components to buffer"
-            );
+                        .len()
+                {
+                    //prev_size != self.shared.scene_storage.components.get_scratch().as_ref().len() {
+                    self.shared.scene_storage.bind_group = create_scene_storage_bind_group(
+                        device,
+                        &self.shared.scene_storage.bind_group_layout,
+                        self.shared.scene_storage.components.buffer().unwrap(),
+                    );
+                }
+            }
         }
+    }
+
+    fn clear_scene_storage(&mut self, device: &Device, queue: &Queue) {
+
+        self.cache.chunk_range = None;
+        self.cache.n_components_by_type.clear();
+
+        self.shared
+            .scene_storage
+            .components
+            .set(Vec::new());
+        self.shared.scene_storage.wire_segments.set(Vec::new());
+
+        self.shared
+            .scene_storage
+            .components
+            .write_buffer(device, queue);
+
+        self.shared
+            .scene_storage
+            .wire_segments
+            .write_buffer(device, queue);
+
+        self.shared.scene_storage.bind_group = create_scene_storage_bind_group(
+            device,
+            &self.shared.scene_storage.bind_group_layout,
+            self.shared.scene_storage.components.buffer().unwrap(),
+        );
     }
 }

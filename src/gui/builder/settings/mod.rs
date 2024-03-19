@@ -27,7 +27,6 @@ impl WidgetSystem for Settings {
                 .spacing([40.0, 4.0])
                 .striped(true)
                 .show(ui, |ui| {
-                    ui.add(egui::Label::new("MSAA"));
                     widget::<AaSelector>(app_state, ui_state, Some(ui), context, WidgetId::new("Aa Selector"));
                     ui.end_row();
                 });

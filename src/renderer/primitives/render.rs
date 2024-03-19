@@ -74,7 +74,7 @@ fn check_and_update_fragments_data_uniforms(
     let mut fragments_type_vec = vec![(0u32, 0u32); cache.n_components_by_type.len()];
     let mut positions = HashSet::<u32>::new();
     
-    for (ty, _n_components) in cache.n_components_by_type.iter() {
+    for (idx, (ty, _n_components)) in cache.n_components_by_type.iter().enumerate() {
         let mut fragments_idx = match cache
             .fragments_index_map
             .get(ty)
@@ -133,8 +133,8 @@ fn check_and_update_fragments_data_uniforms(
             }
         }
 
-        fragments_type_vec[*ty as usize] = (fragments_idx as u32, *ty);
-        positions.insert(*ty);
+        fragments_type_vec[idx] = (fragments_idx as u32, *ty);
+        positions.insert(*ty as u32);
 
     }
 

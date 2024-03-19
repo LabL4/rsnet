@@ -1,8 +1,9 @@
 use nalgebra::Vector2;
 
 pub type ChunkId = (i32, i32);
+pub type ChunkSize = u32;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct ChunkRange {
     pub min_chunk: ChunkId,
     pub max_chunk: ChunkId
@@ -52,8 +53,46 @@ impl ChunkRange {
             }
         }
         
-        
         (in_self_not_other, in_other_not_self)
+    }
+}
+
+pub struct ChunkRangeIterator {
+    min_chunk: ChunkId,
+    max_chunk: ChunkId,
+    current_chunk: ChunkId
+}
+
+impl IntoIterator for ChunkRange {
+    type Item = ChunkId;
+    type IntoIter = ChunkRangeIterator;
+
+    fn into_iter(self) -> Self::IntoIter {
+        ChunkRangeIterator {
+            min_chunk: self.min_chunk,
+            max_chunk: self.max_chunk,
+            current_chunk: self.min_chunk
+        }
+    }
+}
+
+impl Iterator for ChunkRangeIterator {
+    type Item = ChunkId;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.current_chunk.1 > self.max_chunk.1 {
+            return None;
+        }
+
+        let current_chunk = self.current_chunk;
+        self.current_chunk.0 += 1;
+
+        if self.current_chunk.0 > self.max_chunk.0 {
+            self.current_chunk.1 += 1;
+            self.current_chunk.0 = self.min_chunk.0;
+        }
+
+        Some(current_chunk)
     }
 }
 
@@ -142,8 +181,23 @@ mod scene_utils_test {
 
         let (in_self_not_other, in_other_not_self) = r1.diff(&r2);
 
-        assert_eq!(in_self_not_other, vec![]);
-        assert_eq!(in_other_not_self, vec![]);
+        assert_eq!(in_self_not_other, vec![
+            (-3, -1),
+            (-3, 0),
+            (-2, -1),
+            (-2, 0)
+        ]);
+        assert_eq!(in_other_not_self, vec![
+            (-1, -1),
+            (-1, -0),
+            (-1, 1),
+            (0, -1),
+            (0, 0),
+            (0, 1),
+            (1, -1),
+            (1, 0),
+            (1, 1)
+        ]);
 
     }
 

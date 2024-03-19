@@ -28,12 +28,30 @@ struct VertexOutput {
     @location(2) ss_coords: vec2<f32>,
 }
 
+struct TimeData {
+    time: u32,
+}
+
+struct ChunkData {
+    chunk_size: f32,
+    prev_chunk_size: f32,
+    last_chunk_size_update: u32
+}
+
 @group(0) @binding(0)
 var<uniform> camera: CameraUniform;
 @group(0) @binding(1)
 var<uniform> mouse: MouseUniform;
 @group(0) @binding(2)
 var<uniform> window: WindowUniform;
+
+@group(1) @binding(0)
+var<uniform> time: TimeData;
+
+@group(2) @binding(0)
+var<uniform> chunk_data: ChunkData;
+
+const ANIM_DURATION: u32 = 180u; // ms
 
 // p1    p3
 //  *    *
@@ -88,29 +106,49 @@ struct FragmentOutput {
 
 @fragment
 fn fs_main(input: VertexOutput) -> FragmentOutput {
-
     var output: FragmentOutput;
-    
-    let radius = camera.radius;
-    let grid_size = 10.0;//1.0 * max(floor(radius / 30.0)*1.5, 1.0);
-    // let line_width = clamp(radius / 2000.0, 0.005, 0.01);
-    let delta = fwidth(1.0 - min(input.world_coord.x, input.world_coord.y));
-    let line_width = clamp(delta * 0.5, 0.0, 0.1);
 
     let world_coord = input.world_coord;
+        
+    var grid_size = chunk_data.chunk_size;
+    
+    if time.time < chunk_data.last_chunk_size_update + ANIM_DURATION {
+        let t = f32(time.time - chunk_data.last_chunk_size_update) / f32(ANIM_DURATION);
+        grid_size = mix(chunk_data.prev_chunk_size, chunk_data.chunk_size, smoothstep(0.0, 1.0, t));
+    }
 
-    var dist_x = abs((world_coord.x - grid_size / 2) / grid_size - round((world_coord.x - grid_size / 2) / grid_size));
-    var dist_y = abs((world_coord.y - grid_size / 2) / grid_size - round((world_coord.y - grid_size / 2) / grid_size));
+    let grid_size_fourth = grid_size / 4.0;
+
+    let delta = fwidth(min(world_coord.x, world_coord.y));
+    let line_width = delta / grid_size * 5.0;
+    let line_width_fourth = line_width * 2.0;
+
+    let scaled_x = (world_coord.x - grid_size / 2.0) / grid_size;
+    let scaled_y = (world_coord.y - grid_size / 2.0) / grid_size;
+
+    let scaled_x_fourth = scaled_x * grid_size / grid_size_fourth;
+    let scaled_y_fourth = scaled_y * grid_size / grid_size_fourth;
+
+    var dist_x = abs(scaled_x - round(scaled_x));
+    var dist_y = abs(scaled_y - round(scaled_y));
+
+    let dist_x_fourth = abs(scaled_x_fourth - round(scaled_x_fourth));
+    let dist_y_fourth = abs(scaled_y_fourth - round(scaled_y_fourth));
 
     output.color = vec4(1.0, 1.0, 1.0, 0.0);
     
-    if ( dist_x < line_width || dist_y < line_width) {
-        dist_x = (1.0 - step(line_width, dist_x)) * (dist_x - line_width);
-        dist_y = (1.0 - step(line_width, dist_y)) * (dist_y - line_width);
-        
-        var total_distance = length(vec2<f32>(dist_x , dist_y));
+    if ( dist_x < line_width && dist_y < line_width) {      
 
-        output.color = vec4(0.0, 0.0, 0.0, smoothstep(0.0, line_width*0.1, total_distance));
+        var total_distance = length(vec2<f32>(dist_x , dist_y));
+        let p = 0.9;
+
+        output.color = vec4(0.0, 0.0, 0.0, 1.0 - smoothstep(line_width*p, line_width, total_distance));
+    } else if ( dist_x_fourth < line_width_fourth && dist_y_fourth < line_width_fourth) {
+
+        var total_distance = length(vec2<f32>(dist_x_fourth , dist_y_fourth));
+        let p = 0.9;
+
+        output.color = vec4(0.2, 0.2, 0.2, 1.0 - smoothstep(line_width_fourth*p, line_width_fourth, total_distance));
     }
 
 

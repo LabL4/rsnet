@@ -1,23 +1,31 @@
 pub mod component;
+pub mod wire;
 pub mod utils;
 pub mod shared;
 
 use nalgebra::Vector2;
+use tracing::info;
 use utils::*;
 use component::Component;
 
-use crate::utils::Id;
+use rsnet_derive::unwrap_or_return_none;
+use crate::{app::utils::chunk_size_from_step_idx, utils::Id};
 
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::Hash};
 
+use self::wire::WireSegment;
+
+pub type ChunkedStorage<T> = HashMap<u32, HashMap<ChunkId, Vec<T>>>;
 
 #[derive(Debug)]
 pub struct Scene {
-    
-    components: HashMap<ChunkId, Vec<Component>>,
-    id_to_chunk: HashMap<Id, ChunkId>,
 
-    chunk_size: f32
+    // components: HashMap<ChunkId, Vec<Component>>,
+    // components: HashMap<ChunkSize, HashMap<ChunkId, Vec<Component>>>,
+    components: ChunkedStorage<Component>,
+    id_to_chunksize_chunk: HashMap<Id, (ChunkSize, ChunkId)>,
+    wire_segments: ChunkedStorage<WireSegment>,
+
 }
 
 impl Default for Scene {
@@ -30,9 +38,12 @@ impl Scene {
     pub fn new() -> Self {
         let mut scene = Scene {
             components: HashMap::new(),
-            id_to_chunk: HashMap::new(),
-            chunk_size: 10.0
+            id_to_chunksize_chunk: HashMap::new(),
+            wire_segments: HashMap::new(),
         };
+
+        let chunk_size = 10;
+        let chunk_step_idx = 0;
 
         // Add 10M components to the scene
         let n_cols = 4;
@@ -47,9 +58,10 @@ impl Scene {
                 let pos = Vector2::new(i as f32, j as f32) * spacing;
                 let id = j+1 + i*n_cols;
                 // info!("Adding component with id {}", j + i*n_cols);
-                scene.add_component(Component::new(id, 0, pos, 0.0  , id%3));
+                scene.add_component(chunk_step_idx, Component::new(id, 0, pos, 0.0  , id%3));
             }
-        } 
+        }
+
 
         // scene.add_component(Component::new(0, 0, Vector2::new(1.0,0.0), 0.0, 0));
         // scene.add_component(Component::new(0, 0, Vector2::new(10.0,0.0), 0.0, 0));
@@ -57,13 +69,15 @@ impl Scene {
         scene
     }
 
-    pub fn add_component(&mut self, component: Component) {
-        let chunk_id = chunk_id_from_position(&component.position(), self.chunk_size);
+    pub fn add_component(&mut self, chunk_step_idx: u32, component: Component) {
+        let chunk_id = chunk_id_from_position(&component.position(), chunk_size_from_step_idx(chunk_step_idx));
         // info!("Adding component to chunk: {:?}", chunk_id);
 
-        self.id_to_chunk.insert(component.id(), chunk_id);
+        self.id_to_chunksize_chunk.insert(component.id(), (chunk_step_idx, chunk_id));
 
-        let components = self.components.entry(chunk_id).or_insert(Vec::new());
+        let chunked_comps = self.components.entry(chunk_step_idx).or_insert(HashMap::new());
+
+        let components = chunked_comps.entry(chunk_id).or_insert(Vec::new());
         match components.binary_search_by_key(&component.id(), |c| c.id()) {
             Ok(pos) => {
                 components[pos] = component;
@@ -72,13 +86,17 @@ impl Scene {
         }
     }
 
-    pub fn components(&self) -> &HashMap<ChunkId, Vec<Component>>{
+    pub fn components(&self) -> &ChunkedStorage<Component> {
         &self.components
     }
 
     pub fn get_component(&self, id: Id) -> Option<&Component> {
-        let chunk_id = self.id_to_chunk.get(&id)?;
-        let components = self.components.get(chunk_id)?;
+        unwrap_or_return_none!(chunk_size_chunk_id, self.id_to_chunksize_chunk.get(&id));
+        let (chunk_size, chunk_id) = chunk_size_chunk_id;
+
+        unwrap_or_return_none!(chunked_components, self.components.get(chunk_size));
+
+        unwrap_or_return_none!(components, chunked_components.get(chunk_id));
         
         match components.binary_search_by_key(&id, |c| c.id()) {
             Ok(pos) => Some(&components[pos]),
@@ -87,12 +105,14 @@ impl Scene {
     }
 
     pub fn get_components_in_chunk(&self, chunk_id: &ChunkId) -> Option<&Vec<Component>> {
-        self.components.get(chunk_id)
+        // self.components.get(chunk_id)
+        None
     }
 
-    pub fn chunk_size(&self) -> f32 {
-        self.chunk_size
+    pub fn wire_segments(&self) -> &ChunkedStorage<WireSegment> {
+        &self.wire_segments
     }
+
 
     // pub fn compute_id_to_chunk(&mut self, chunk_size: f32) {
     //     self.chunk_size = chunk_size;

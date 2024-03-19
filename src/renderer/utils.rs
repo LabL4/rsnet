@@ -24,8 +24,8 @@ pub struct UniformBufferData<T: ShaderType + WriteInto> {
 
 impl<T: ShaderType + WriteInto>UniformBufferData<T> {
     pub fn set(&mut self, value: T) {
+        self.encase_buffer.write(&value).unwrap();
         self.uniform = value;
-        self.encase_buffer.write(&self.uniform).unwrap();
     }
 
     pub fn get(&self) -> &T {
@@ -304,56 +304,6 @@ pub fn attach_common_uniforms(device: &Device, camera_uniform: CameraUniform, mo
 
 }
 
-pub fn attach_empty_scene_storage(device: &Device) -> SceneStorage {
-    
-    let mut components = StorageBufferData::empty(Vec::new());
-    components.set_label(Some("Components storage buffer"));
-    components.add_usages(wgpu::BufferUsages::STORAGE);
-    components.add_usages(wgpu::BufferUsages::COPY_DST);
-
-
-    let components_encase_buffer = storage_as_wgsl_bytes(&components.value).unwrap();
-    let components_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some(format!("{} storage buffer", "Scene").as_str()),
-        contents: &components_encase_buffer.as_ref(),
-        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-    });
-
-    let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("Scene storage bind group layout"),
-        entries: &[wgpu::BindGroupLayoutEntry {
-            binding: 0,
-            count: None,
-            ty: wgpu::BindingType::Buffer {
-                ty: wgpu::BufferBindingType::Storage { read_only: true },
-                has_dynamic_offset: false,
-                min_binding_size: None,
-            },
-            visibility: wgpu::ShaderStages::VERTEX,
-        }],
-    });
-
-    let bind_group = create_scene_storage_bind_group(device, &bind_group_layout, &components_buffer);
-
-
-    SceneStorage {
-        components,
-        bind_group,
-        bind_group_layout,
-    }
-}
-
-pub fn create_scene_storage_bind_group(device: &Device, layout: &wgpu::BindGroupLayout, components_buffer: &wgpu::Buffer) -> wgpu::BindGroup {
-    device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: Some("Scene storage bind group"),
-        layout: layout,
-        entries: &[wgpu::BindGroupEntry {
-            binding: 0,
-            resource: components_buffer.as_entire_binding(),
-        }],
-    })
-}
-
 pub struct Texture {
     pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
@@ -397,4 +347,122 @@ pub fn create_depth_texture(device: &wgpu::Device, config: &wgpu::SurfaceConfigu
 
     Self { texture, view, sampler }
 }
+}
+
+
+#[derive(ShaderType, Debug, Default)]
+pub struct TimeData {
+    pub time: u32,
+}
+
+pub struct TimeUniform {
+    pub uniform_buffer_data: UniformBufferData<TimeData>,
+    pub bind_group: wgpu::BindGroup,
+    pub bind_group_layout: wgpu::BindGroupLayout,
+}
+
+pub fn attach_time_data_uniform(device: &Device, time: u32) -> TimeUniform {
+    let encase_buffer = uniform_as_wgsl_bytes(&time).unwrap();
+    let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("Time buffer"),
+        contents: &encase_buffer.as_ref(),
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+    });
+
+    let bind_group_layout = time_data_layout(device);
+
+    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("Time bind group"),
+        layout: &bind_group_layout,
+        entries: &[wgpu::BindGroupEntry {
+            binding: 0,
+            resource: buffer.as_entire_binding(),
+        }],
+    });
+
+    TimeUniform {
+        uniform_buffer_data: UniformBufferData {
+            uniform: TimeData { time },
+            encase_buffer,
+            buffer,
+        },
+        bind_group: bind_group,
+        bind_group_layout: bind_group_layout,
+    }
+}
+
+pub fn time_data_layout(device: &Device) -> wgpu::BindGroupLayout {
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("Time bind group layout"),
+        entries: &[wgpu::BindGroupLayoutEntry {
+            binding: 0,
+            count: None,
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+        }],
+    })
+}
+
+#[derive(ShaderType, Debug, Default)]
+pub struct ChunkData {
+    pub chunk_size: f32,
+    pub prev_chunk_size: f32,
+    pub last_chunk_size_update: u32,
+}
+
+pub struct ChunkDataUniform {
+    pub uniform_buffer_data: UniformBufferData<ChunkData>,
+    pub bind_group: wgpu::BindGroup,
+    pub bind_group_layout: wgpu::BindGroupLayout,
+}
+
+pub fn attach_chunk_data_uniform(device: &Device, chunk_data: ChunkData) -> ChunkDataUniform {
+
+    let encase_buffer = uniform_as_wgsl_bytes(&chunk_data).unwrap();
+    let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("Chunk data buffer"),
+        contents: &encase_buffer.as_ref(),
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+    });
+
+    let bind_group_layout = chunk_data_layout(device);
+
+    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("Scene storage bind group"),
+        layout: &bind_group_layout,
+        entries: &[wgpu::BindGroupEntry {
+            binding: 0,
+            resource: buffer.as_entire_binding(),
+        }],
+    });
+
+    ChunkDataUniform {
+        uniform_buffer_data: UniformBufferData {
+            uniform: chunk_data,
+            encase_buffer,
+            buffer,
+        },
+        bind_group: bind_group,
+        bind_group_layout: bind_group_layout,
+    }
+}
+
+pub fn chunk_data_layout(device: &Device) -> wgpu::BindGroupLayout {
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("Chunk data bind group layout"),
+        entries: &[wgpu::BindGroupLayoutEntry {
+            binding: 0,
+            count: None,
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+        }],
+    })
 }

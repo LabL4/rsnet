@@ -25,3 +25,7 @@ pub fn create_multisampled_framebuffer(
         .create_texture(multisampled_frame_descriptor)
         .create_view(&wgpu::TextureViewDescriptor::default())
 }
+
+pub fn chunk_size_from_step_idx(step_idx: u32) -> f32 {
+    (10.0f32).powf(step_idx as f32).max(10.0)
+}

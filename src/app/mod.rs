@@ -4,6 +4,7 @@ pub mod utils;
 pub mod state;
 
 use camera::CameraController;
+use smaa::SmaaTarget;
 
 use self::utils::create_multisampled_framebuffer;
 pub use self::state::State;
@@ -36,6 +37,7 @@ pub struct App<'a> {
     pub ui_state: gui::state::State,
 
     frame_counter: FrameCounter,
+    smaa_target: Option<SmaaTarget>,
 }
 
 impl<'a> App<'a> {
@@ -59,7 +61,8 @@ impl<'a> App<'a> {
             state: State::default(),
             ui_state: gui::state::State::default(),
             camera_controller,
-            frame_counter
+            frame_counter,
+            smaa_target: None,
         }
     }
 
@@ -78,7 +81,8 @@ impl<'a> App<'a> {
 
     pub fn resize(&mut self, size: winit::dpi::PhysicalSize<u32>) {
         if self.msaa_view.is_some() {
-            self.create_msaa_view(self.state.msaa_count());
+            self.create_msaa_view();
+            self.create_smaa_target();
         }
         self.camera_controller.resize(size);
     }
@@ -86,7 +90,7 @@ impl<'a> App<'a> {
     pub fn render(&mut self) {
         if self.state.rebuild_bundles() {
             if self.state.msaa_count() != 1 {
-                self.create_msaa_view(self.state.msaa_count());
+                self.create_msaa_view();
             } else {
                 self.msaa_view = None;
             }
@@ -97,12 +101,23 @@ impl<'a> App<'a> {
             self.state.set_rebuild_bundles(false);
         }
 
-        let frame = self.surface.acquire(&self.context);
+        if self.state.rebuild_smaa() {
+            self.create_smaa_target();
+            self.state.set_rebuild_smaa(false);
+        }
 
+        let frame = self.surface.acquire(&self.context);
+        
         let view = frame.texture.create_view(&TextureViewDescriptor {
             format: Some(self.surface.config().view_formats[0]),
             ..TextureViewDescriptor::default()
         });
+
+        let mut smaa_frame = None;
+        if let Some(smaa_target) = &mut self.smaa_target {
+            smaa_frame = Some(smaa_target.start_frame(&self.context.device, &self.context.queue, &view));
+        }
+
 
         let mut encoder = self
             .context
@@ -116,8 +131,7 @@ impl<'a> App<'a> {
         if let Some(scene_renderer) = &mut self.scene_renderer {
             scene_renderer.render(
                 self.msaa_view.as_ref(),
-                // None,
-                &view,
+                smaa_frame.as_deref().unwrap_or(&view),
                 &self.context,
                 &mut encoder,
                 &mut self.camera_controller,
@@ -132,7 +146,7 @@ impl<'a> App<'a> {
                 &mut encoder,
                 &self.window,
                 None,
-                &view,
+                smaa_frame.as_deref().unwrap_or(&view),
                 ScreenDescriptor {
                     size_in_pixels: [window_size.width, window_size.height],
                     pixels_per_point: self.window.scale_factor() as f32,
@@ -143,13 +157,18 @@ impl<'a> App<'a> {
 
         self.context.queue.submit(iter::once(encoder.finish()));
 
+        if let Some(smaa_frame) = smaa_frame {
+            smaa_frame.resolve();
+        }
+        
         frame.present();
 
         self.frame_counter.update();
         self.state.set_current_frame_time(self.frame_counter.frame_time());
     }
 
-    fn create_msaa_view(&mut self, msaa_count: u32) {
+    fn create_msaa_view(&mut self) {
+        let msaa_count = self.state.msaa_count();
         // let msaa_samples = 4;
         let msaa_texture = create_multisampled_framebuffer(
             &self.context.device,
@@ -157,6 +176,19 @@ impl<'a> App<'a> {
             msaa_count,
         );
         self.msaa_view = Some(msaa_texture);
+    }
+
+
+    pub fn create_smaa_target(&mut self) {
+        let smaa_target = SmaaTarget::new(
+            &self.context.device,
+            &self.context.queue,
+            self.surface.config().width,
+            self.surface.config().height,
+            self.surface.config().view_formats[0],
+            self.state.smaa_mode()
+        );
+        self.smaa_target = Some(smaa_target);
     }
 
     

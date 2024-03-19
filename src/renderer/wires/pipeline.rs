@@ -6,18 +6,19 @@ pub fn create_pipeline(
     config: &SurfaceConfiguration,
     device: &Device,
     msaa_count: u32,
+    common_uniforms_bg_layout: &wgpu::BindGroupLayout,
+    scene_storage_bg_layout: &wgpu::BindGroupLayout
 ) -> wgpu::RenderPipeline {
 
-    let common_uniforms_layout = common_uniforms_layout(device);
-    let time_data_layout = time_data_layout(device);
-    let chunk_data_layout = chunk_data_layout(device);
 
-
-    let bind_group_layouts = [&common_uniforms_layout, &time_data_layout, &chunk_data_layout];
+    let bind_group_layouts = [
+        common_uniforms_bg_layout,
+        scene_storage_bg_layout
+    ];
 
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: Some("Main shader"),
-        source: wgpu::ShaderSource::Wgsl(include_str!(shader_path!("grid/grid.wgsl")).into()),
+        label: Some("Wire shader"),
+        source: wgpu::ShaderSource::Wgsl(include_str!(shader_path!("wires/wires.wgsl")).into()),
     });
 
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -31,7 +32,7 @@ pub fn create_pipeline(
     // let depth_format = None;
 
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("Grid effect render pipeline"),
+        label: Some("Wire render pipeline"),
         layout: Some(&layout),
         vertex: wgpu::VertexState {
             module: &shader,

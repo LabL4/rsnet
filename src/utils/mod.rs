@@ -33,11 +33,14 @@ impl AaBb {
 #[macro_export]
 macro_rules! timed {
     ($e:expr, $name:expr) => {{
-        let start = std::time::Instant::now();
-        let result = $e;
-        let elapsed = start.elapsed();
-        info!("{} took: {:?} ms", $name, elapsed.as_millis());
-        result
+        {
+            let start = std::time::Instant::now();
+            let result = $e;
+            let elapsed = start.elapsed();
+
+            result
+        }
+        // info!("{} took: {:?} ms", $name, elapsed.as_millis());
     }};
 }
 
@@ -121,4 +124,52 @@ mod tests {
         assert_eq!(vec, vec![10, 11, 12, 1, 2, 3, 4, 5, 13, 14, 15]);
 
     }
+
+    #[test]
+    fn test_merge_sorted_vecs() {
+        let v1 = vec![1, 3, 5, 7, 9];
+        let v2 = vec![2, 4, 6, 8, 10];
+
+        let result = merge_sorted_vecs(v1, v2);
+        assert_eq!(result, vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+
+        let v1 = vec![1, 3, 5, 7, 9];
+        let v2 = vec![2, 4, 6, 8, 10, 11, 12, 13, 14, 15];
+
+        let result = merge_sorted_vecs(v1, v2);
+        assert_eq!(result, vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
+
+        let v1 = vec![1, 3, 5, 7, 9, 11, 12, 13, 14, 15];
+        let v2 = vec![1, 2, 3, 4, 6, 8, 10, 19];
+
+        let result = merge_sorted_vecs(v1, v2);
+        assert_eq!(result, vec![1, 1, 2, 3, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 19]);
+    }
+}
+
+pub fn merge_sorted_vecs<T: PartialOrd + Clone>(v1: Vec<T>, v2: Vec<T>) -> Vec<T> {
+    let mut p1 = 0;
+    let mut p2 = 0;
+
+    let mut result = Vec::with_capacity(v1.len() + v2.len());
+
+    while result.len() < v1.len() + v2.len() {
+        if p1 < v1.len() && p2 < v2.len() {
+            if v1[p1] < v2[p2] {
+                result.push(v1[p1].clone());
+                p1 += 1;
+            } else {
+                result.push(v2[p2].clone());
+                p2 += 1;
+            }
+        } else if p1 < v1.len() {
+            result.push(v1[p1].clone());
+            p1 += 1;
+        } else if p2 < v2.len() {
+            result.push(v2[p2].clone());
+            p2 += 1;
+        }
+    }
+
+    result
 }

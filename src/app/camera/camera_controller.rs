@@ -1,8 +1,8 @@
 use super::camera::Camera;
-use crate::utils::AaBb;
+use crate::{app::utils::chunk_size_from_step_idx, utils::AaBb};
 
 use std::f32::consts::FRAC_PI_2;
-use nalgebra::{Matrix4, Perspective3, Point3, RealField, UnitQuaternion, Vector2, Vector3};
+use nalgebra::{ComplexField, Matrix4, Perspective3, Point3, RealField, UnitQuaternion, Vector2, Vector3};
 use tracing::info;
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
@@ -125,7 +125,11 @@ pub struct CameraController {
     window_size: PhysicalSize<u32>,
     pub is_dirty: bool,
 
-    pub screen_world_aabb: AaBb
+    pub screen_world_aabb: AaBb,
+    pub chunk_size: f32,
+    pub chunk_step_idx: usize,
+    chunk_size_step: f32,
+    base_chunk_size: f32,
 }
 impl CameraController {
     pub fn new(window_size: PhysicalSize<u32>) -> Self {
@@ -172,6 +176,10 @@ impl CameraController {
         let last_mouse_pos_rotation = None;
         let modifiers = ModifiersState::default();
 
+        let chunk_size_step = 100.0;
+        let base_chunk_size = 10.0;
+
+        let (chunk_size, chunk_step_idx) = chunk_size_from_radius(radius, chunk_size_step, base_chunk_size);
 
         Self {
             mouse_drag_state,
@@ -199,7 +207,11 @@ impl CameraController {
             window_size,
             is_dirty,
 
-            screen_world_aabb
+            screen_world_aabb,
+            chunk_size,
+            chunk_step_idx,
+            chunk_size_step,
+            base_chunk_size
         }
     }
 
@@ -216,14 +228,41 @@ impl CameraController {
     }
 
     fn update_radius(&mut self, delta: MouseScrollDelta) {
-        // info!("Delta: {:#?}", delta);
+        let camera_right = self.camera.get_right_vector();
+        let camera_up = self.camera.get_up_vector();
+
         match delta {
             MouseScrollDelta::LineDelta(_delta_x, delta_y) => {
-                self.radius += delta_y * self.radius_sensitivity * 5.0 * self.radius;
+                let delta_radius = delta_y * self.radius_sensitivity * 5.0 * self.radius;
+                // let new_radius = self.radius + delta_radius;
+                let new_radius = (self.radius + delta_radius).min(MAX_RADIUS).max(MIN_RADIUS);
+
+                let diff = mouse_diff_from_radius(
+                    &self.current_mouse.position,
+                    &self.window_size,
+                    &self.camera.get_perspective(),
+                    self.radius,
+                    new_radius,
+                );
+
+                self.center = self.center + camera_right * (diff).x + camera_up * (diff).y;
+                self.radius = new_radius;
             }
             MouseScrollDelta::PixelDelta(delta) => {
                 if self.modifiers.control_key() {
-                    self.radius += (delta.y as f32) * self.radius_sensitivity * self.radius;
+                    let delta_radius = (delta.y as f32) * self.radius_sensitivity * self.radius;
+                    let new_radius = (self.radius + delta_radius).min(MAX_RADIUS).max(MIN_RADIUS);
+
+                    let diff = mouse_diff_from_radius(
+                        &self.current_mouse.position,
+                        &self.window_size,
+                        &self.camera.get_perspective(),
+                        self.radius,
+                        new_radius,
+                    );
+
+                    self.center = self.center + camera_right * (diff).x + camera_up * (diff).y;
+                    self.radius = new_radius;
                 } else {
                     let width_half = self.window_size.width as f32 / 2.0;
                     let height_half = self.window_size.height as f32 / 2.0;
@@ -242,10 +281,6 @@ impl CameraController {
 
                     let diff = -(end_unproj - start_unproj) * self.radius;
 
-                    let camera_right = self.camera.get_right_vector();
-                    let camera_up = self.camera.get_up_vector();
-                    // let camera_view_dir = self.camera.get_view_dir();
-
                     self.center =
                         self.center + camera_right.normalize() * (diff).x - camera_up * (diff).y;
 
@@ -254,7 +289,13 @@ impl CameraController {
                 }
             }
         }
+
         self.radius = self.radius.max(MIN_RADIUS).min(MAX_RADIUS);
+        
+        let (chunk_size, chunk_step_idx) = chunk_size_from_radius(self.radius, self.chunk_size_step, self.base_chunk_size);
+        self.chunk_size = chunk_size;
+        self.chunk_step_idx = chunk_step_idx;
+
         self.update_view_matrix();        
     }
 
@@ -440,6 +481,28 @@ pub fn unproject_point<T: RealField>(perspective: &Perspective3<T>, p: &Point3<T
     ) / znear
 }
 
+fn mouse_diff_from_radius(
+    mouse_pos: &PhysicalPosition<f64>,
+    window_size: &PhysicalSize<u32>,
+    perspective: &Perspective3<f32>,
+    radius: f32,
+    new_radius: f32,
+) -> Vector2<f32> {
+    let mouse_ndc = Point3::new(
+        mouse_pos.x as f32 / window_size.width as f32 - 0.5,
+        -(mouse_pos.y as f32 / window_size.height as f32 - 0.5),
+        0.0,
+    );
+
+    let start_unproj = unproject_point(&perspective, &mouse_ndc);
+    
+    let start = start_unproj * radius;
+    let end = start_unproj * new_radius;
+
+    let diff = start - end;
+    Vector2::new(diff.x, diff.y)
+}
+
 /// Get screen space axis aligned bounding box
 #[inline]
 pub fn get_ss_aabb(perspective: &Perspective3<f32>, radius: f32, center: &Vector3<f32>) -> AaBb {
@@ -452,4 +515,9 @@ pub fn get_ss_aabb(perspective: &Perspective3<f32>, radius: f32, center: &Vector
         min: Vector2::new(min.x, min.y),
         max: Vector2::new(max.x, max.y),
     }
+}
+
+pub fn chunk_size_from_radius(radius: f32, chunk_size_step: f32, base_chunk_size: f32) -> (f32, usize) {
+    let chunk_step_idx = (radius.log10().round() - 1.0) as usize;
+    (chunk_size_from_step_idx(chunk_step_idx as u32), (chunk_step_idx as i32 - 1).max(0) as usize)
 }
