@@ -1,6 +1,5 @@
-use crate::shader_path;
-
 use bytemuck::{Pod, Zeroable};
+use rsnet_derive::include_shader;
 use wgpu::{util::DeviceExt, Device, SurfaceConfiguration};
 
 #[repr(C)]
@@ -125,10 +124,15 @@ pub fn create_primitive_pipeline_unnamed(
     bind_group_layouts: &[&wgpu::BindGroupLayout],
 ) -> wgpu::RenderPipeline {
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: Some("Main shader"),
-        source: wgpu::ShaderSource::Wgsl(include_str!(shader_path!("primitives/primitive.wgsl")).into()),
+        label: Some("Primitive shader"),
+        source: wgpu::ShaderSource::Wgsl(include_shader!("primitives/primitive.wgsl").into()),
 
     });
+
+    // let a = "";
+    // a.lines().for_each(|line| {
+    //     if line.starts_with(pat)
+    // });
 
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("Primitive render pipeline layout"),

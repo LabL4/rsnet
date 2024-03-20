@@ -518,6 +518,6 @@ pub fn get_ss_aabb(perspective: &Perspective3<f32>, radius: f32, center: &Vector
 }
 
 pub fn chunk_size_from_radius(radius: f32, chunk_size_step: f32, base_chunk_size: f32) -> (f32, usize) {
-    let chunk_step_idx = (radius.log10().round() - 1.0) as usize;
+    let chunk_step_idx = (radius.log(10.0).round() - 1.0) as usize;
     (chunk_size_from_step_idx(chunk_step_idx as u32), (chunk_step_idx as i32 - 1).max(0) as usize)
 }

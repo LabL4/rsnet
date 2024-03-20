@@ -1,5 +1,6 @@
-use crate::{renderer::{chunk_data_layout, common_uniforms_layout, time_data_layout}, shader_path};
+use crate::renderer::{chunk_data_layout, common_uniforms_layout, time_data_layout};
 
+use rsnet_derive::include_shader;
 use wgpu::{Device, SurfaceConfiguration};
 
 pub fn create_pipeline(
@@ -7,18 +8,13 @@ pub fn create_pipeline(
     device: &Device,
     msaa_count: u32,
     common_uniforms_bg_layout: &wgpu::BindGroupLayout,
-    scene_storage_bg_layout: &wgpu::BindGroupLayout
+    scene_storage_bg_layout: &wgpu::BindGroupLayout,
 ) -> wgpu::RenderPipeline {
-
-
-    let bind_group_layouts = [
-        common_uniforms_bg_layout,
-        scene_storage_bg_layout
-    ];
+    let bind_group_layouts = [common_uniforms_bg_layout, scene_storage_bg_layout];
 
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("Wire shader"),
-        source: wgpu::ShaderSource::Wgsl(include_str!(shader_path!("wires/wires.wgsl")).into()),
+        source: wgpu::ShaderSource::Wgsl(include_shader!("wires/wires.wgsl").into()),
     });
 
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -37,7 +33,7 @@ pub fn create_pipeline(
         vertex: wgpu::VertexState {
             module: &shader,
             entry_point: "vs_main",
-            buffers: vertex_layouts
+            buffers: vertex_layouts,
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,

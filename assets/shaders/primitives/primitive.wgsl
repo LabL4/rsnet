@@ -1,45 +1,9 @@
-struct AaBb {
-    min: vec2<f32>,
-    max: vec2<f32>,
-};
+//!include common.inc $bg=0
 
-struct CameraUniform {
-    view_proj: mat4x4<f32>,
-    aabb: AaBb,
-    radius: f32,
-};
+//!include fragments_storage.inc $bg=1
 
-struct MouseUniform {
-    pos: vec2<f32>,
-};
+//!include scene_storage.inc $bg=2
 
-struct WindowUniform {
-    size: vec2<u32>,
-    aspect: f32,
-}
-
-const MAX_FRAGMENTS = 15;
-
-@group(0) @binding(0)
-var<uniform> camera: CameraUniform;
-@group(0) @binding(1)
-var<uniform> mouse: MouseUniform;
-@group(0) @binding(2)
-var<uniform> window: WindowUniform;
-
-@group(1) @binding(0)
-var<storage, read> component_ty_fragments: array<ComponentTyFragments>;
-@group(1) @binding(1)
-var<storage, read> circles: array<CircleFragment>;
-@group(1) @binding(2)
-var<storage, read> lines: array<LineFragment>;
-@group(1) @binding(3)
-var<storage, read> rectangles: array<RectangleFragment>;
-@group(1) @binding(4)
-var<storage, read> triangles: array<TriangleFragment>;
-
-@group(2) @binding(0)
-var<storage, read> components: array<Component>;
 
 @group(3) @binding(0)
 var<uniform> fragments_data: FragmentsData;
@@ -47,55 +11,6 @@ var<uniform> fragments_data: FragmentsData;
 struct FragmentsData {
     fragments_idx: u32,
 }
-
-struct ComponentTyFragments {
-    circles_start: u32,
-    n_circles: u32,
-
-    lines_start: u32,
-    n_lines: u32,
-
-    rectangles_start: u32,
-    n_rectangles: u32,
-
-    triangles_start: u32,
-    n_triangles: u32,
-}
-
-struct CircleFragment {
-    center: vec2<f32>,
-    radius: f32,
-    color: u32,
-};
-
-struct LineFragment {
-    start: vec2<f32>,
-    end: vec2<f32>,
-    thickness: f32,
-    ty: u32, // 0 - middle fragment, 1 start fragment, 2 end fragment, 3 single fragment,
-    line_cap_ty: u32,
-    color: u32,
-};
-
-struct RectangleFragment {
-    center: vec2<f32>,
-    size: vec2<f32>,
-    color: u32
-}
-
-struct TriangleFragment {
-    center: vec2<f32>,
-    size: vec2<f32>,
-    dir_vec: vec2<f32>,
-    color: u32
-}
-
-struct Component {
-    model: mat3x3<f32>,
-    id: u32,
-    ty: u32,
-}
-
 
 struct VertexOutput {
     @builtin(position) clip_pos: vec4<f32>,

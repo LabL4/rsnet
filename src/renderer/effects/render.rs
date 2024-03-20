@@ -1,6 +1,6 @@
 use wgpu::{RenderPass, RenderPipeline, BindGroup};
 
-pub fn render_effects<'b, 'c>(
+pub fn render<'b, 'c>(
     render_pass: &mut RenderPass<'c>,
     pipeline: &'b RenderPipeline,
     common_uniforms_bind_group: &'b BindGroup,

@@ -9,13 +9,6 @@ use wgpu::{util::DeviceExt, Device};
 
 const SHADER_ROOT: &'static str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/shaders/");
 
-#[macro_export]
-macro_rules! shader_path {
-    ( $x:expr ) => {
-        concat!(env!("CARGO_MANIFEST_DIR"), "/assets/shaders/", $x)
-    };
-}
-
 pub struct UniformBufferData<T: ShaderType + WriteInto> {
     pub uniform: T,
     pub encase_buffer: UniformBuffer<Vec<u8>>, // Hope this is a good idea
@@ -114,6 +107,10 @@ impl<T: ShaderType + WriteInto> StorageBufferData<T> {
 
     pub fn get_label(&self) -> Option<&str> {
         self.label.as_deref()
+    }
+
+    pub fn usages(&self) -> wgpu::BufferUsages {
+        self.buffer_usage
     }
 
     pub fn add_usages(&mut self, usage: wgpu::BufferUsages) {

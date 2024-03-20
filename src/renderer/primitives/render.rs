@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 use tracing::info;
 use wgpu::{Device, Queue};
 
-pub fn render_primitives<'b, 'c>(
+pub fn render<'b, 'c>(
     render_pass: &mut wgpu::RenderPass<'c>,
     pipeline: &'b wgpu::RenderPipeline,
     context: &Context,
@@ -138,9 +138,14 @@ fn check_and_update_fragments_data_uniforms(
 
     }
 
+    // info!("Positions: {:?}", positions);
+
     fragments_type_vec.retain(|(_fragments_idx, ty)| {
         positions.contains(ty)
     });
+
+    // sort by ty
+    fragments_type_vec.sort_by(|a, b| a.1.cmp(&b.1));
 
     fragments_type_vec
 }

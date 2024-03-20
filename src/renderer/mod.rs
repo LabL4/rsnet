@@ -3,6 +3,7 @@ pub mod primitives;
 pub mod shared;
 pub mod utils;
 pub mod wires;
+pub mod shader;
 
 use primitives::{
     common::*,
@@ -207,6 +208,14 @@ impl<'a> Renderer<'a> {
 
         self.pipelines.grid_effect =
             effects::grid::pipeline::create_pipeline(config, device, self.msaa_count);
+
+        self.pipelines.wires = wires::pipeline::create_pipeline(
+            config,
+            device,
+            self.msaa_count,
+            &self.shared.common_uniforms.bind_group_layout,
+            &self.shared.scene_storage.bind_group_layout,
+        );
     }
 
     pub fn update_camera(&mut self, camera: &Camera, queue: &Queue) {
@@ -319,7 +328,7 @@ impl<'a> Renderer<'a> {
 
         // self.render_effects(&mut render_pass);
 
-        effects::render::render_effects(
+        effects::render::render(
             &mut render_pass,
             &self.pipelines.grid_effect,
             &self.shared.common_uniforms.bind_group,
@@ -327,7 +336,7 @@ impl<'a> Renderer<'a> {
             &self.shared.chunk_data_uniform.bind_group,
         );
 
-        primitives::render::render_primitives(
+        primitives::render::render(
             &mut render_pass,
             &self.pipelines.primitive,
             &context,
@@ -337,6 +346,13 @@ impl<'a> Renderer<'a> {
             &mut self.shared.fragments_data_uniform_map,
             &self.shared.scene_storage.bind_group,
             &self.shared.common_uniforms.bind_group,
+        );
+
+        wires::render::render(
+            &mut render_pass,
+            &self.pipelines.wires,
+            &self.shared.common_uniforms.bind_group,
+            &self.shared.scene_storage.bind_group,
         );
 
         self.last_rendered = t;
@@ -700,10 +716,18 @@ impl<'a> Renderer<'a> {
 
             if n_aditions + n_deletions > 0 {
                 // self.shared.scene_storage.components.set(components.clone());
-                let prev_size = self
+                let prev_comp_size = self
                     .shared
                     .scene_storage
                     .components
+                    .get_scratch()
+                    .as_ref()
+                    .len();
+
+                let prev_wire_size = self
+                    .shared
+                    .scene_storage
+                    .wire_segments
                     .get_scratch()
                     .as_ref()
                     .len();
@@ -712,20 +736,37 @@ impl<'a> Renderer<'a> {
                     .scene_storage
                     .components
                     .write_buffer(device, queue);
-                if prev_size
-                    != self
-                        .shared
-                        .scene_storage
-                        .components
-                        .get_scratch()
-                        .as_ref()
-                        .len()
+
+                self.shared
+                    .scene_storage
+                    .wire_segments
+                    .write_buffer(device, queue);
+
+                let comp_size = self
+                    .shared
+                    .scene_storage
+                    .components
+                    .get_scratch()
+                    .as_ref()
+                    .len();
+
+                let wire_size = self
+                    .shared
+                    .scene_storage
+                    .wire_segments
+                    .get_scratch()
+                    .as_ref()
+                    .len();
+
+                if prev_comp_size
+                    != comp_size || prev_wire_size != wire_size
                 {
                     //prev_size != self.shared.scene_storage.components.get_scratch().as_ref().len() {
                     self.shared.scene_storage.bind_group = create_scene_storage_bind_group(
                         device,
                         &self.shared.scene_storage.bind_group_layout,
                         self.shared.scene_storage.components.buffer().unwrap(),
+                        self.shared.scene_storage.wire_segments.buffer().unwrap(),
                     );
                 }
             }
@@ -757,6 +798,7 @@ impl<'a> Renderer<'a> {
             device,
             &self.shared.scene_storage.bind_group_layout,
             self.shared.scene_storage.components.buffer().unwrap(),
+            self.shared.scene_storage.wire_segments.buffer().unwrap()
         );
     }
 }

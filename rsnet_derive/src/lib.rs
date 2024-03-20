@@ -1,7 +1,10 @@
+
 extern crate proc_macro;
 extern crate syn;
 #[macro_use]
 extern crate quote;
+
+mod renderer;
 
 use proc_macro::TokenStream;
 use syn::{parse::Parse, Expr, Token};
@@ -87,3 +90,7 @@ pub fn unwrap_or_return_none(input: TokenStream) -> TokenStream {
     output.into()
 }
 
+#[proc_macro]
+pub fn include_shader(input: TokenStream) -> TokenStream {
+    renderer::include_shader(input)
+}

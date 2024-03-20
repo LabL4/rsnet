@@ -1,5 +1,6 @@
-use crate::{renderer::{chunk_data_layout, common_uniforms_layout, time_data_layout}, shader_path};
+use crate::renderer::{chunk_data_layout, common_uniforms_layout, time_data_layout};
 
+use rsnet_derive::include_shader;
 use wgpu::{Device, SurfaceConfiguration};
 
 pub fn create_pipeline(
@@ -12,12 +13,11 @@ pub fn create_pipeline(
     let time_data_layout = time_data_layout(device);
     let chunk_data_layout = chunk_data_layout(device);
 
-
     let bind_group_layouts = [&common_uniforms_layout, &time_data_layout, &chunk_data_layout];
 
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("Main shader"),
-        source: wgpu::ShaderSource::Wgsl(include_str!(shader_path!("grid/grid.wgsl")).into()),
+        source: wgpu::ShaderSource::Wgsl(include_shader!("grid/grid.wgsl").into()),
     });
 
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
