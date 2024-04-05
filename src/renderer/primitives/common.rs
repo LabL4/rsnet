@@ -5,79 +5,68 @@ use crate::renderer::primitives::*;
 use lazy_static::lazy_static;
 use nalgebra::Vector2;
 
-const MEMRISTOR_HEIGHT: f32 = 1.0;
-const MEMRISTOR_WIDTH: f32 = 0.4;
+const MEMRISTOR_HEIGHT: f32 = 0.6;
+const MEMRISTOR_WIDTH: f32 = 0.2;
 const MEMRISTOR_LOWER_RECT_HEIGHT: f32 = 0.05;
 const MEMRISTOR_UPPER_HEIGHT: f32 = MEMRISTOR_HEIGHT - MEMRISTOR_LOWER_RECT_HEIGHT;
-const N_VERTICAL_DIVS: f32 = 5.0;
+const MEMRISTOR_N_VERTICAL_DIVS: f32 = 5.0;
+const MEMRISTOR_LINE_THICKNESS: f32 = 0.02;
+
 const LINE_THICKNESS: f32 = 0.03;
 
 lazy_static!(
-    pub static ref MEMRISTOR_PRIMITIVES_L0: ComponentTyPrimitives = {
+    pub static ref UNKNOWN_PRIMITIVE: ComponentTyPrimitives = ComponentTyPrimitives {
+        circles: vec![],
+        lines: vec![],
+        rectangles: vec![
+            RectanglePrimitive {
+                position: Vector2::new(0.0, 0.0),
+                size: Vector2::new(1.0, 1.0),
+                color: 0xFF0000
+            }
+        ],
+        triangles: vec![]
+    };
 
+    pub static ref MEMRISTOR_PRIMITIVES_L0: ComponentTyPrimitives = {
 
         let mut central_line: Vec<Vector2<f32>> = vec![];
 
         central_line.push(Vector2::new(0.0, MEMRISTOR_HEIGHT / 2.0));
-        central_line.push(Vector2::new(central_line.last().unwrap().x, central_line.last().unwrap().y - MEMRISTOR_UPPER_HEIGHT / N_VERTICAL_DIVS));
+        central_line.push(Vector2::new(central_line.last().unwrap().x, central_line.last().unwrap().y - MEMRISTOR_UPPER_HEIGHT / MEMRISTOR_N_VERTICAL_DIVS));
         central_line.push(Vector2::new(central_line.last().unwrap().x + MEMRISTOR_WIDTH / 4.0, central_line.last().unwrap().y));
-        central_line.push(Vector2::new(central_line.last().unwrap().x, central_line.last().unwrap().y - MEMRISTOR_UPPER_HEIGHT / N_VERTICAL_DIVS));
+        central_line.push(Vector2::new(central_line.last().unwrap().x, central_line.last().unwrap().y - MEMRISTOR_UPPER_HEIGHT / MEMRISTOR_N_VERTICAL_DIVS));
         central_line.push(Vector2::new(central_line.last().unwrap().x - MEMRISTOR_WIDTH / 2.0, central_line.last().unwrap().y));
-        central_line.push(Vector2::new(central_line.last().unwrap().x, central_line.last().unwrap().y - MEMRISTOR_UPPER_HEIGHT / N_VERTICAL_DIVS));
+        central_line.push(Vector2::new(central_line.last().unwrap().x, central_line.last().unwrap().y - MEMRISTOR_UPPER_HEIGHT / MEMRISTOR_N_VERTICAL_DIVS));
         central_line.push(Vector2::new(central_line.last().unwrap().x + MEMRISTOR_WIDTH / 2.0, central_line.last().unwrap().y));
-        central_line.push(Vector2::new(central_line.last().unwrap().x, central_line.last().unwrap().y - MEMRISTOR_UPPER_HEIGHT / N_VERTICAL_DIVS));
+        central_line.push(Vector2::new(central_line.last().unwrap().x, central_line.last().unwrap().y - MEMRISTOR_UPPER_HEIGHT / MEMRISTOR_N_VERTICAL_DIVS));
         central_line.push(Vector2::new(central_line.last().unwrap().x - MEMRISTOR_WIDTH / 4.0, central_line.last().unwrap().y));
-        central_line.push(Vector2::new(central_line.last().unwrap().x, central_line.last().unwrap().y - MEMRISTOR_UPPER_HEIGHT / N_VERTICAL_DIVS));
+        central_line.push(Vector2::new(central_line.last().unwrap().x, central_line.last().unwrap().y - MEMRISTOR_UPPER_HEIGHT / MEMRISTOR_N_VERTICAL_DIVS));
 
         let mut outline: Vec<Vector2<f32>> = vec![];
 
-        outline.push(Vector2::new(-MEMRISTOR_WIDTH / 2.0 - LINE_THICKNESS/2.0, -MEMRISTOR_HEIGHT / 2.0));
+        outline.push(Vector2::new(-MEMRISTOR_WIDTH / 2.0 - MEMRISTOR_LINE_THICKNESS/2.0, -MEMRISTOR_HEIGHT / 2.0));
         outline.push(Vector2::new(MEMRISTOR_WIDTH / 2.0, -MEMRISTOR_HEIGHT / 2.0));
         outline.push(Vector2::new(MEMRISTOR_WIDTH / 2.0, MEMRISTOR_HEIGHT / 2.0));
         outline.push(Vector2::new(-MEMRISTOR_WIDTH / 2.0, MEMRISTOR_HEIGHT / 2.0));
         outline.push(Vector2::new(-MEMRISTOR_WIDTH / 2.0, -MEMRISTOR_HEIGHT / 2.0));
 
-        // Primitives {
-        //     circles: vec![],
-        //     lines: vec![],
-        //     rectangles: vec![
-        //         RectanglePrimitive {
-        //             position: Vector2::new(0.0, 0.0),
-        //             size: Vector2::new(MEMRISTOR_WIDTH, MEMRISTOR_HEIGHT),
-        //             color: 0x000000
-        //         },
-        //     ]
-        // }
-
         ComponentTyPrimitives {
-            circles: vec![
-                // CirclePrimitive {
-                //     position: Vector2::new(0.0, 0.0),
-                //     radius: 1.0,
-                //     color: 0x000000
-                // },
-                // CirclePrimitive {
-                //     position: Vector2::new(2.0, -10.0),
-                //     radius: 1.0,
-                //     color: 0xFFFFFF
-                // },
-
-            ],
+            circles: vec![],
             lines: vec![
                 LinePrimitive {
                     positions: central_line,
-                    thickness: LINE_THICKNESS,
+                    thickness: MEMRISTOR_LINE_THICKNESS,
                     // color: 0xF5A142
                     color: 0x000000,
                     line_cap_ty: 0
                 },
                 LinePrimitive {
                     positions: outline,
-                    thickness: LINE_THICKNESS,
+                    thickness: MEMRISTOR_LINE_THICKNESS,
                     // color: 0xF5A142
                     color: 0x000000,
                     line_cap_ty: 0
-
                 }
             ],
             rectangles: vec![

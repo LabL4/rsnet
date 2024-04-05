@@ -2,10 +2,10 @@ use crate::scene::shared::SceneStorage;
 
 use super::shared::*;
 
-use std::{fmt::Debug, num::NonZeroU32};
 use encase::{internal::WriteInto, ShaderType, StorageBuffer, UniformBuffer};
+use std::{fmt::Debug, num::NonZeroU32};
 use tracing::info;
-use wgpu::{util::DeviceExt, Device};
+use wgpu::{core::binding_model::BindGroupDescriptor, util::DeviceExt, BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, Buffer, Device};
 
 const SHADER_ROOT: &'static str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/shaders/");
 
@@ -15,7 +15,7 @@ pub struct UniformBufferData<T: ShaderType + WriteInto> {
     pub buffer: wgpu::Buffer,
 }
 
-impl<T: ShaderType + WriteInto>UniformBufferData<T> {
+impl<T: ShaderType + WriteInto> UniformBufferData<T> {
     pub fn set(&mut self, value: T) {
         self.encase_buffer.write(&value).unwrap();
         self.uniform = value;
@@ -56,11 +56,10 @@ pub struct StorageBufferData<T> {
     label: Option<String>,
     changed: bool,
     buffer_usage: wgpu::BufferUsages,
-    last_update: std::time::Instant
+    last_update: std::time::Instant,
 }
 
 impl<T: ShaderType + WriteInto> StorageBufferData<T> {
-
     pub fn empty(value: T) -> Self {
         Self {
             value,
@@ -70,7 +69,7 @@ impl<T: ShaderType + WriteInto> StorageBufferData<T> {
             label: None,
             changed: false,
             buffer_usage: wgpu::BufferUsages::STORAGE,
-            last_update: std::time::Instant::now()
+            last_update: std::time::Instant::now(),
         }
     }
 
@@ -118,7 +117,7 @@ impl<T: ShaderType + WriteInto> StorageBufferData<T> {
         self.changed = true;
     }
 
-    pub fn write_buffer(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
+    pub fn write_buffer(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) -> bool {
         // self.scratch.as_mut().clear();
         // self.scratch.set_offset(0);
         self.scratch.write(&self.value).unwrap();
@@ -130,8 +129,14 @@ impl<T: ShaderType + WriteInto> StorageBufferData<T> {
         let capacity: u64 = self.buffer.as_ref().map(wgpu::Buffer::size).unwrap_or(0);
         let size = self.scratch.as_ref().len() as u64;
 
+        let mut resized = false;
+
         if capacity < size || self.changed {
-            info!("Creating new buffer, capacity: {}, size: {}", capacity, size);
+            resized = true;
+            info!(
+                "Creating new buffer, capacity: {}, size: {}",
+                capacity, size
+            );
             self.buffer = Some(
                 device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     contents: &self.scratch.as_ref(),
@@ -143,13 +148,16 @@ impl<T: ShaderType + WriteInto> StorageBufferData<T> {
         } else if let Some(buffer) = &self.buffer {
             queue.write_buffer(buffer, 0, &self.scratch.as_ref());
         }
+
+        // println!("buffer: {:#?}", self.buffer)
+
+        resized
     }
 
     pub fn is_dirty(&self) -> bool {
         self.changed
     }
 }
-
 
 // pub fn attach_uniform<T: ShaderType + WriteInto + Default + Debug>(
 //     device: &Device,
@@ -196,7 +204,7 @@ impl<T: ShaderType + WriteInto> StorageBufferData<T> {
 //     }
 // }
 
-// trait UniformTrait: 
+// trait UniformTrait:
 
 pub fn common_uniforms_layout(device: &Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -236,7 +244,12 @@ pub fn common_uniforms_layout(device: &Device) -> wgpu::BindGroupLayout {
     })
 }
 
-pub fn attach_common_uniforms(device: &Device, camera_uniform: CameraUniform, mouse_uniform: MouseUniform, window_uniform: WindowUniform) -> CommonUniforms {
+pub fn attach_common_uniforms(
+    device: &Device,
+    camera_uniform: CameraUniform,
+    mouse_uniform: MouseUniform,
+    window_uniform: WindowUniform,
+) -> CommonUniforms {
     let camera_encase_buffer = uniform_as_wgsl_bytes(&camera_uniform).unwrap();
     let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some(format!("{} buffer", "Camera").as_str()),
@@ -298,7 +311,6 @@ pub fn attach_common_uniforms(device: &Device, camera_uniform: CameraUniform, mo
         bind_group,
         bind_group_layout,
     }
-
 }
 
 pub struct Texture {
@@ -307,28 +319,33 @@ pub struct Texture {
     pub sampler: wgpu::Sampler,
 }
 impl Texture {
-pub fn create_depth_texture(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration, label: &str) -> Self {
-    let size = wgpu::Extent3d { // 2.
-        width: config.width,
-        height: config.height,
-        depth_or_array_layers: 1,
-    };
-    let desc = wgpu::TextureDescriptor {
-        label: Some(label),
-        size,
-        mip_level_count: 1,
-        sample_count: 4,
-        dimension: wgpu::TextureDimension::D2,
-        format: wgpu::TextureFormat::Depth32Float,
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT // 3.
+    pub fn create_depth_texture(
+        device: &wgpu::Device,
+        config: &wgpu::SurfaceConfiguration,
+        label: &str,
+    ) -> Self {
+        let size = wgpu::Extent3d {
+            // 2.
+            width: config.width,
+            height: config.height,
+            depth_or_array_layers: 1,
+        };
+        let desc = wgpu::TextureDescriptor {
+            label: Some(label),
+            size,
+            mip_level_count: 1,
+            sample_count: 4,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Depth32Float,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT // 3.
             | wgpu::TextureUsages::TEXTURE_BINDING,
-        view_formats: &[],
-    };
-    let texture = device.create_texture(&desc);
+            view_formats: &[],
+        };
+        let texture = device.create_texture(&desc);
 
-    let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-    let sampler = device.create_sampler(
-        &wgpu::SamplerDescriptor { // 4.
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            // 4.
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             address_mode_w: wgpu::AddressMode::ClampToEdge,
@@ -339,13 +356,15 @@ pub fn create_depth_texture(device: &wgpu::Device, config: &wgpu::SurfaceConfigu
             lod_min_clamp: 0.0,
             lod_max_clamp: 100.0,
             ..Default::default()
+        });
+
+        Self {
+            texture,
+            view,
+            sampler,
         }
-    );
-
-    Self { texture, view, sampler }
+    }
 }
-}
-
 
 #[derive(ShaderType, Debug, Default)]
 pub struct TimeData {
@@ -358,33 +377,35 @@ pub struct TimeUniform {
     pub bind_group_layout: wgpu::BindGroupLayout,
 }
 
-pub fn attach_time_data_uniform(device: &Device, time: u32) -> TimeUniform {
-    let encase_buffer = uniform_as_wgsl_bytes(&time).unwrap();
-    let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Time buffer"),
-        contents: &encase_buffer.as_ref(),
-        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-    });
+impl TimeUniform {
+    pub fn attach(device: &Device, time: u32) -> Self {
+        let encase_buffer = uniform_as_wgsl_bytes(&time).unwrap();
+        let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Time buffer"),
+            contents: &encase_buffer.as_ref(),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
 
-    let bind_group_layout = time_data_layout(device);
+        let bind_group_layout = time_data_layout(device);
 
-    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: Some("Time bind group"),
-        layout: &bind_group_layout,
-        entries: &[wgpu::BindGroupEntry {
-            binding: 0,
-            resource: buffer.as_entire_binding(),
-        }],
-    });
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Time bind group"),
+            layout: &bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: buffer.as_entire_binding(),
+            }],
+        });
 
-    TimeUniform {
-        uniform_buffer_data: UniformBufferData {
-            uniform: TimeData { time },
-            encase_buffer,
-            buffer,
-        },
-        bind_group: bind_group,
-        bind_group_layout: bind_group_layout,
+        TimeUniform {
+            uniform_buffer_data: UniformBufferData {
+                uniform: TimeData { time },
+                encase_buffer,
+                buffer,
+            },
+            bind_group: bind_group,
+            bind_group_layout: bind_group_layout,
+        }
     }
 }
 
@@ -417,8 +438,66 @@ pub struct ChunkDataUniform {
     pub bind_group_layout: wgpu::BindGroupLayout,
 }
 
-pub fn attach_chunk_data_uniform(device: &Device, chunk_data: ChunkData) -> ChunkDataUniform {
+macro_rules! chunk_data_uniform_bind_group_layout_descriptor {
+    () => {
+        wgpu::BindGroupLayoutDescriptor {
+            label: Some("Chunk data bind group layout"),
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                count: None,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+            }],
+        }        
+    };
+}
 
+impl ChunkDataUniform {
+
+    pub fn create_bind_group(
+        device: &Device,
+        layout: &BindGroupLayout,
+        buffer: &Buffer
+    ) -> BindGroup {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("ChunkDataUniform bind group"),
+            layout: &layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: buffer.as_entire_binding(),
+            }],
+        })
+    }
+
+    pub fn attach(device: &Device, chunk_data: ChunkData) -> Self {
+        let encase_buffer = uniform_as_wgsl_bytes(&chunk_data).unwrap();
+        let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Chunk data buffer"),
+            contents: &encase_buffer.as_ref(),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+    
+        let bind_group_layout = device.create_bind_group_layout(&chunk_data_uniform_bind_group_layout_descriptor!());
+    
+        let bind_group = Self::create_bind_group(device, &bind_group_layout, &buffer);
+    
+        Self {
+            uniform_buffer_data: UniformBufferData {
+                uniform: chunk_data,
+                encase_buffer,
+                buffer,
+            },
+            bind_group: bind_group,
+            bind_group_layout: bind_group_layout,
+        }
+    }
+}
+
+pub fn attach_chunk_data_uniform(device: &Device, chunk_data: ChunkData) -> ChunkDataUniform {
     let encase_buffer = uniform_as_wgsl_bytes(&chunk_data).unwrap();
     let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Chunk data buffer"),

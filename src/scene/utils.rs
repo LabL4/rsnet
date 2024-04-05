@@ -3,6 +3,19 @@ use nalgebra::Vector2;
 pub type ChunkId = (i32, i32);
 pub type ChunkSize = u32;
 
+pub trait FromPosition {
+    fn from_position(position: &Vector2<f32>, chunk_size: f32) -> Self;
+}
+
+impl FromPosition for ChunkId {
+    fn from_position(position: &Vector2<f32>, chunk_size: f32) -> Self {
+        let chunk_x = ((position.x + chunk_size / 2.0) / chunk_size).floor() as i32;
+        let chunk_y = ((position.y + chunk_size / 2.0) / chunk_size).floor() as i32;
+
+        (chunk_x, chunk_y)
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct ChunkRange {
     pub min_chunk: ChunkId,

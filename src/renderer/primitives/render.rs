@@ -76,7 +76,7 @@ fn check_and_update_fragments_data_uniforms(
     
     for (idx, (ty, _n_components)) in cache.n_components_by_type.iter().enumerate() {
         let mut fragments_idx = match cache
-            .fragments_index_map
+            .fragments_comptype_index_map
             .get(ty)
             .unwrap()
             .binary_search_by_key(&(camera_controller.radius() as usize), |v| v.1 as usize)
@@ -85,12 +85,15 @@ fn check_and_update_fragments_data_uniforms(
             Err(i) => i,
         };
 
-        if fragments_idx >= cache.fragments_index_map.get(ty).unwrap().len() {
+        if fragments_idx >= cache.fragments_comptype_index_map.get(ty).unwrap().len() {
             // fragment_idx = cache.fragments_index_map.get(ty).unwrap().len() - 1;
             continue;
         }
 
-        fragments_idx = cache.fragments_index_map.get(ty).unwrap()[fragments_idx].0 as usize;
+        
+        fragments_idx = cache.fragments_comptype_index_map.get(ty).unwrap()[fragments_idx].0 as usize;
+        
+        println!("fragments_idx: {}", fragments_idx);
 
         if *ty == 0 {
             // info!("Fragments idx for 0 is {}", fragments_idx);
@@ -99,20 +102,20 @@ fn check_and_update_fragments_data_uniforms(
         match fragments_data_uniform_map.get_mut(ty) {
             Some(fragments_data_uniform) => {
                 let prev_fragment_idx =
-                    fragments_data_uniform.fragments_data.uniform.fragments_idx;
+                    fragments_data_uniform.buffer.uniform.fragments_idx;
 
                 if prev_fragment_idx != fragments_idx as u32 {
                     // info!("Prev was {}, new is {}", prev_fragment_idx, fragments_idx);
                     let fragments_data = FragmentsData {
                         fragments_idx: fragments_idx as u32,
                     };
-                    fragments_data_uniform.fragments_data.set(fragments_data);
+                    fragments_data_uniform.buffer.set(fragments_data);
                     // .write(&fragments_data)
                     // .unwrap();
                     queue.write_buffer(
-                        &fragments_data_uniform.fragments_data.buffer,
+                        &fragments_data_uniform.buffer.buffer,
                         0,
-                        fragments_data_uniform.fragments_data.encase_buffer.as_ref(),
+                        fragments_data_uniform.buffer.encase_buffer.as_ref(),
                     );
                 }
             }
@@ -122,11 +125,11 @@ fn check_and_update_fragments_data_uniforms(
                     fragments_idx: fragments_idx as u32,
                 };
 
-                fragments_data_uniform.fragments_data.set(fragments_data);
+                fragments_data_uniform.buffer.set(fragments_data);
                 queue.write_buffer(
-                    &fragments_data_uniform.fragments_data.buffer,
+                    &fragments_data_uniform.buffer.buffer,
                     0,
-                    fragments_data_uniform.fragments_data.encase_buffer.as_ref(),
+                    fragments_data_uniform.buffer.encase_buffer.as_ref(),
                 );
 
                 fragments_data_uniform_map.insert(*ty, fragments_data_uniform);

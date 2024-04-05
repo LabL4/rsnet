@@ -56,7 +56,7 @@ pub fn component_primitives_vec_to_fragments(
     )
 }
 
-fn attach_buffer<T: ShaderType + WriteInto>(
+pub fn attach_buffer<T: ShaderType + WriteInto>(
     device: &Device,
     label: &str,
     data: T,
@@ -221,7 +221,7 @@ pub fn attach_fragment_data_uniform(device: &Device) -> FragmentsDataUniform {
     });
 
     FragmentsDataUniform {
-        fragments_data: UniformBufferData {
+        buffer: UniformBufferData {
             uniform: fragments_data,
             buffer: fragments_data_buffer,
             encase_buffer: fragments_data_encase_buffer,

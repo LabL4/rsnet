@@ -75,7 +75,7 @@ impl WireSegmentBufferEntry {
     }
 }
 
-/// The Scene struct contains the full Scene data, and the SceneStorage struct contains the data
+/// The Scene struct contains tdxe full Scene data, and the SceneStorage struct contains the data
 /// that is used to render the visible part of the scene.
 pub struct SceneStorage {
     pub wire_segments: StorageBufferData<Vec<WireSegmentBufferEntry>>,
@@ -84,71 +84,73 @@ pub struct SceneStorage {
     pub bind_group_layout: wgpu::BindGroupLayout,
 }
 
-pub fn attach_empty_scene_storage(device: &Device) -> SceneStorage {
-    let mut components = StorageBufferData::empty(Vec::new());
-    components.set_label(Some("Components storage buffer"));
-    components.add_usages(wgpu::BufferUsages::STORAGE);
-    components.add_usages(wgpu::BufferUsages::COPY_DST);
+impl SceneStorage {
+    pub fn attach_empty(device: &Device) -> Self {
+        let mut components = StorageBufferData::empty(Vec::new());
+        components.set_label(Some("Components storage buffer"));
+        components.add_usages(wgpu::BufferUsages::STORAGE);
+        components.add_usages(wgpu::BufferUsages::COPY_DST);
 
-    let components_encase_buffer = storage_as_wgsl_bytes(&components.get()).unwrap();
-    let components_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Components storage array"),
-        contents: &components_encase_buffer.as_ref(),
-        usage: components.usages(),
-    });
+        let components_encase_buffer = storage_as_wgsl_bytes(&components.get()).unwrap();
+        let components_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Components storage array"),
+            contents: &components_encase_buffer.as_ref(),
+            usage: components.usages(),
+        });
 
-    let mut wire_segments = StorageBufferData::empty(Vec::new());
-    wire_segments.set_label(Some("Wire segments storage buffer"));
-    wire_segments.add_usages(wgpu::BufferUsages::STORAGE);
-    wire_segments.add_usages(wgpu::BufferUsages::COPY_DST);
+        let mut wire_segments = StorageBufferData::empty(Vec::new());
+        wire_segments.set_label(Some("Wire segments storage buffer"));
+        wire_segments.add_usages(wgpu::BufferUsages::STORAGE);
+        wire_segments.add_usages(wgpu::BufferUsages::COPY_DST);
 
-    let wire_segments_encase_buffer = storage_as_wgsl_bytes(&wire_segments.get()).unwrap();
-    let wire_segments_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Wire segments storage array"),
-        contents: &wire_segments_encase_buffer.as_ref(),
-        usage: wire_segments.usages(),
-    });
+        let wire_segments_encase_buffer = storage_as_wgsl_bytes(&wire_segments.get()).unwrap();
+        let wire_segments_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Wire segments storage array"),
+            contents: &wire_segments_encase_buffer.as_ref(),
+            usage: wire_segments.usages(),
+        });
 
-    let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("Scene storage bind group layout"),
-        entries: &[
-            wgpu::BindGroupLayoutEntry {
-                // Components
-                binding: 0,
-                count: None,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Storage { read_only: true },
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("Scene storage bind group layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    // Components
+                    binding: 0,
+                    count: None,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    visibility: wgpu::ShaderStages::VERTEX,
                 },
-                visibility: wgpu::ShaderStages::VERTEX,
-            },
-            wgpu::BindGroupLayoutEntry {
-                // Wire segments
-                binding: 1,
-                count: None,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Storage { read_only: true },
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
+                wgpu::BindGroupLayoutEntry {
+                    // Wire segments
+                    binding: 1,
+                    count: None,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    visibility: wgpu::ShaderStages::VERTEX,
                 },
-                visibility: wgpu::ShaderStages::VERTEX,
-            },
-        ],
-    });
+            ],
+        });
 
-    let bind_group = create_scene_storage_bind_group(
-        device,
-        &bind_group_layout,
-        &components_buffer,
-        &wire_segments_buffer,
-    );
+        let bind_group = create_scene_storage_bind_group(
+            device,
+            &bind_group_layout,
+            &components_buffer,
+            &wire_segments_buffer,
+        );
 
-    SceneStorage {
-        wire_segments,
-        components,
-        bind_group,
-        bind_group_layout,
+        SceneStorage {
+            wire_segments,
+            components,
+            bind_group,
+            bind_group_layout,
+        }
     }
 }
 
