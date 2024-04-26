@@ -1,4 +1,3 @@
-
 extern crate proc_macro;
 extern crate syn;
 #[macro_use]
@@ -13,7 +12,6 @@ use syn::{parse::Parse, Expr, Token};
 
 #[proc_macro_derive(Widget)]
 pub fn derive(input: TokenStream) -> TokenStream {
-
     let item = syn::parse(input).expect("failed to parse input");
 
     match item {
@@ -27,7 +25,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
                     fn as_any(&self) -> &dyn Any {
                         self
                     }
-        
+
                     fn as_any_mut(&mut self) -> &mut dyn Any {
                         self
                     }
@@ -37,18 +35,17 @@ pub fn derive(input: TokenStream) -> TokenStream {
             };
 
             return expanded.into();
-        },
+        }
         _ => {
             // syn::Error::new_spanned(&input, "This is not a struct")
             //     .to_compile_error()
             //     .into()
-        },
+        }
     };
 
-    let output = quote!{ #item };
+    let output = quote! { #item };
     output.into()
 }
-
 
 struct GetOrReturnNoneMacroInput {
     var_name: syn::Ident,
@@ -75,10 +72,8 @@ impl Parse for GetOrReturnNoneMacroInput {
 pub fn unwrap_or_return_none(input: TokenStream) -> TokenStream {
     let input_expr = syn::parse_macro_input!(input as GetOrReturnNoneMacroInput);
 
-
     let var_name = input_expr.var_name;
     let get_expr = input_expr.get_expr;
-    
 
     let output = quote! {
         let #var_name: Option<_> = #get_expr;

@@ -75,59 +75,6 @@ pub fn attach_buffer<T: ShaderType + WriteInto>(
     (storage, buffer)
 }
 
-pub fn attach_fragment_storage(
-    device: &Device,
-    primitives: Vec<&ComponentTyPrimitives>,
-) -> FragmentsStorage {
-    let (component_ty_fragments, circles, lines, rectangles, triangles) =
-        component_primitives_vec_to_fragments(primitives);
-
-    let (component_ty_fragments_storage, component_ty_fragments_buffer) = attach_buffer(
-        device,
-        "component_ty_fragments storage buffer",
-        component_ty_fragments,
-    );
-
-    let (circles_storage, circles_buffer) =
-        attach_buffer(device, "circles storage buffer", circles);
-
-    let (lines_storage, lines_buffer) = attach_buffer(device, "lines storage buffer", lines);
-
-    let (rectangles_storage, rectangles_buffer) =
-        attach_buffer(device, "rectangles storage buffer", rectangles);
-
-    let (triangles_storage, triangles_buffer) =
-        attach_buffer(device, "triangles storage buffer", triangles);
-
-    let bind_group_layout =
-        device.create_bind_group_layout(&fragments_bind_group_layout_descriptor());
-
-    info!("Componentstype fragments: {:?}", component_ty_fragments_storage.get());
-    info!("Rectangles: {:?}", rectangles_storage.get());
-
-    let bind_group = create_fragment_storage_bind_group(
-        device,
-        &bind_group_layout,
-        &[
-            &component_ty_fragments_buffer,
-            &circles_buffer,
-            &lines_buffer,
-            &rectangles_buffer,
-            &triangles_buffer,
-        ],
-    );
-
-    FragmentsStorage {
-        component_ty_fragments: component_ty_fragments_storage,
-        circle_fragments: circles_storage,
-        line_fragments: lines_storage,
-        rectangle_fragments: rectangles_storage,
-        triangles_fragments: triangles_storage,
-        bind_group,
-        bind_group_layout,
-    }
-}
-
 pub fn fragments_bind_group_layout_descriptor<'a>() -> BindGroupLayoutDescriptor<'a> {
     BindGroupLayoutDescriptor {
         label: Some("Fragments storage bind group layout"),

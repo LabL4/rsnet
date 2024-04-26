@@ -31,10 +31,10 @@ fn mat3_to_mat4(m: mat3x3<f32>) -> mat4x4<f32> {
 }
 
 // ------ / Top side
-// p1    p2
+// p1    p3
 //  *    *
 //  *    *
-// p0   p3
+// p0   p2
 
 // 00
 // 01
@@ -72,7 +72,16 @@ fn vs_line(vertex_idx: u32, fragment: LineFragment, prev_fragment: LineFragment,
     let normal = vec2<f32>(-dir.y, dir.x); // Clockwise
 
     let right_bit = (vertex_idx >> 1u) & 1u;
-    let up_bit = vertex_idx & 1u;
+    let up_bit = (vertex_idx & 1u);
+
+    // up_bit = ~(up_bit ^ (u32(step(0.0, dir.x)) | right_bit)) & 1u;
+    // right_bit = ~(right_bit ^ u32(step(0.0, dir.x))) & 1u;
+
+
+    // 0 0 1
+    // 0 1 0
+    // 1 0 0
+    // 1 1 1
     
     let right_bit_f32 = f32(right_bit);
     let up_bit_f32 = f32(up_bit);
@@ -86,63 +95,40 @@ fn vs_line(vertex_idx: u32, fragment: LineFragment, prev_fragment: LineFragment,
 
     var selected_normal: vec2<f32>;
 
-    
-    
-    if (right_bit == 1u && (fragment.ty == 1u || fragment.ty == 0u)) { // start fragment (cap at end)
-        let next_fragment_dir = normalize(next_fragment.end - next_fragment.start);
-        let next_normal = vec2<f32>(-next_fragment_dir.y, next_fragment_dir.x);
-        
+    // needs cap at end if 1u
+    let cap_at_end = right_bit == 1u && (fragment.ty == 1u || fragment.ty == 0u);
+    let cap_at_start = right_bit == 0u && (fragment.ty == 2u || fragment.ty == 0u);
+
+    let next_prev_fragment_dir =
+        normalize(next_fragment.end - next_fragment.start) * f32(cap_at_end && !cap_at_start) +
+        normalize(prev_fragment.end - prev_fragment.start) * f32(cap_at_start && !cap_at_end);
+
+    let prev_next_normal = vec2<f32>(-next_prev_fragment_dir.y, next_prev_fragment_dir.x);
+
+    if (cap_at_end || cap_at_start) { // start fragment (cap at end)
         switch fragment.line_cap_ty {
             case 1u: {
-                let v = normalize(dir + next_fragment_dir);
+                let v = normalize(dir + next_prev_fragment_dir);
 
-                let cos_phi = dot(dir, next_normal);
-                let l = fragment.thickness / 2.0 / abs(cos_phi);
+                let cos_phi = dot(dir, prev_next_normal);
+                let l = fragment.thickness / 2.0 / cos_phi;
 
                 let cos_theta = dot(dir, v);
 
-                let l2 = l * cos_theta * 2.0;
+                let l2 = l * abs(cos_theta) * 2.0;
 
                 selected_normal = -v * l2 * (2.0 / fragment.thickness);
             }
             case 0u, default: {
-                let intersection_vec_norm = normalize(normal + next_normal);
+                let intersection_vec_norm = normalize(normal + prev_next_normal);
                 let cos_theta = dot(intersection_vec_norm, normal);
                 let intersection_vec = 1.0 / cos_theta * intersection_vec_norm;
 
                 selected_normal = intersection_vec;
+                // selected_normal = normal;
+
             }
         }
-        
-
-    } else if (right_bit == 0u && (fragment.ty == 2u || fragment.ty == 0u)) { // end fragment (cap at start)
-        let prev_fragment_dir = normalize(prev_fragment.end - prev_fragment.start);
-        let prev_normal = vec2<f32>(-prev_fragment_dir.y, prev_fragment_dir.x);
-        // let intersection_vec = normal + prev_normal;
-        
-
-        switch fragment.line_cap_ty {
-            case 1u: {
-                let v = normalize(dir + prev_fragment_dir);
-
-                let cos_phi = dot(dir, prev_normal);
-                let l = fragment.thickness / 2.0 / abs(cos_phi);
-
-                let cos_theta = dot(dir, v);
-
-                let l2 = l * cos_theta * 2.0;
-
-                selected_normal = v * l2 * (2.0 / fragment.thickness );
-            }
-            case 0u, default: {
-                let intersection_vec_norm = normalize(normal + prev_normal);
-                let cos_theta = dot(intersection_vec_norm, normal);
-                let intersection_vec = 1.0 / cos_theta * intersection_vec_norm;
-
-                selected_normal = intersection_vec;
-            }
-        }
-
     } else {
         selected_normal = normal;
     }
@@ -214,6 +200,8 @@ fn vs_triangle(vertex_idx: u32, real_vertex_idx: u32, fragment: TriangleFragment
     return output;
 }
 
+
+
 @vertex
 fn vs_main(
     // @location(0) component_idx: u32,
@@ -226,6 +214,7 @@ fn vs_main(
     let component_idx = instance_index;
 
     var output: VertexOutput;
+
 
     let component = components[component_idx];
     var fragments = component_ty_fragments[fragments_data.fragments_idx];
@@ -249,12 +238,7 @@ fn vs_main(
                 clamp(calc_idx / third_idx, 0u, 1u) * 3u
             )
         )
-    )) ;
-
-    if (fragment_idx == 14u) {
-        idx = 3u;
-    }
-
+    ));
 
     switch idx {
         case 3u: {
@@ -273,12 +257,12 @@ fn vs_main(
         }
         case 1u: {
             let idx = fragment_idx - fragments.n_circles;
-            let prev_idx = u32(max(0i, i32(idx) - 1i));
-            let next_idx = min(arrayLength(&lines) - 1u, idx + 1u);
+            let prev_idx = u32(max(0i, i32(fragments.lines_start) + i32(idx) - 1i));
+            let next_idx = min(arrayLength(&lines) - 1u, fragments.lines_start + idx + 1u);
 
             var fragment = lines[fragments.lines_start + idx];
-            var prev_fragment = lines[fragments.lines_start + prev_idx];
-            var next_fragment = lines[fragments.lines_start + next_idx];
+            var prev_fragment = lines[prev_idx];
+            var next_fragment = lines[next_idx];
 
             output = vs_line(vertex_idx_in_fragment, fragment, prev_fragment, next_fragment);
             output.fragment_ty = 1u;

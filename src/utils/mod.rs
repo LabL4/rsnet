@@ -48,7 +48,6 @@ pub fn insert_ordered_at<T: Default + Clone + Debug>(
     vec: &mut Vec<T>,
     mut to_insert: HashMap<usize, Vec<T>>,
 ) {
-
     if to_insert.is_empty() {
         return;
     }
@@ -122,7 +121,6 @@ mod tests {
         insert_ordered_at(&mut vec, to_insert);
 
         assert_eq!(vec, vec![10, 11, 12, 1, 2, 3, 4, 5, 13, 14, 15]);
-
     }
 
     #[test]
@@ -137,13 +135,30 @@ mod tests {
         let v2 = vec![2, 4, 6, 8, 10, 11, 12, 13, 14, 15];
 
         let result = merge_sorted_vecs(v1, v2);
-        assert_eq!(result, vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
+        assert_eq!(
+            result,
+            vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+        );
 
         let v1 = vec![1, 3, 5, 7, 9, 11, 12, 13, 14, 15];
         let v2 = vec![1, 2, 3, 4, 6, 8, 10, 19];
 
         let result = merge_sorted_vecs(v1, v2);
-        assert_eq!(result, vec![1, 1, 2, 3, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 19]);
+        assert_eq!(
+            result,
+            vec![1, 1, 2, 3, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 19]
+        );
+    }
+
+    #[test]
+    fn test_retain_by_range() {
+        let mut vec = vec![1, 2, 3, 4, 5, 6, 7, 8, 9];
+        retain_by_range(&mut vec, (2, 6), false);
+        assert_eq!(vec, vec![3, 4, 5, 6, 7]);
+
+        let mut vec = vec![1, 2, 3, 4, 5, 6, 7, 8, 9];
+        retain_by_range(&mut vec, (0, 8), false);
+        assert_eq!(vec, vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
     }
 }
 
@@ -172,4 +187,20 @@ pub fn merge_sorted_vecs<T: PartialOrd + Clone>(v1: Vec<T>, v2: Vec<T>) -> Vec<T
     }
 
     result
+}
+
+/// Retains elements in a vector that are within a given range, inclusive.\
+/// range: [min, max)
+/// invert: if true, retains elements outside the range
+pub fn retain_by_range<T>(vec: &mut Vec<T>, range: (usize, usize), invert: bool) {
+    let mut idx = 0;
+    vec.retain(|_el| {
+        let keep = idx >= range.0 && idx < range.1;
+        idx += 1;
+        if invert {
+            !keep
+        } else {
+            keep
+        }
+    });
 }

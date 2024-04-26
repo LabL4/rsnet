@@ -10,6 +10,7 @@ pub struct WireSegment {
     wire_id: u32,
     start: Vector2<f32>,
     end: Vector2<f32>,
+    ty: u32, // 0: middle, 1: start, 2: end, 3: single
 }
 
 impl WireSegment {
@@ -33,12 +34,13 @@ impl WireSegment {
 #[derive(Debug)]
 pub struct Wire {
     id: u32,
+    // positions: Vec<Vector2<f32>>,
     start: Vector2<f32>,
     end: Vector2<f32>,
+    // node_id: u32
 }
 
 impl Wire {
-
     pub fn new(id: u32, start: Vector2<f32>, end: Vector2<f32>) -> Self {
         Wire { id, start, end }
     }
@@ -76,6 +78,7 @@ impl Wire {
                     wire_id: self.id,
                     start,
                     end,
+                    ty: 0
                 },
             ));
         }

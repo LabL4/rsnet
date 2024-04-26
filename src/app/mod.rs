@@ -1,25 +1,28 @@
 pub mod camera;
 pub mod event_loop;
-pub mod utils;
 pub mod state;
+pub mod utils;
 
 use camera::CameraController;
 use smaa::SmaaTarget;
 
-use self::utils::create_multisampled_framebuffer;
 pub use self::state::State;
+use self::utils::create_multisampled_framebuffer;
 use crate::{
     gui::{self, renderer::GuiRenderer},
     renderer::Renderer,
     scene,
-    utils::{frame_counter, wgpu::{context::Context, surface::SurfaceWrapper}, FrameCounter},
+    utils::{
+        frame_counter,
+        wgpu::{context::Context, surface::SurfaceWrapper},
+        FrameCounter,
+    },
 };
 
 use egui_wgpu::ScreenDescriptor;
 use std::{iter, sync::Arc};
 use wgpu::{CommandEncoderDescriptor, TextureViewDescriptor};
 use winit::window::Window;
-
 
 pub struct App<'a> {
     pub gui_renderer: Option<GuiRenderer>,
@@ -97,7 +100,7 @@ impl<'a> App<'a> {
             if let Some(scene_renderer) = &mut self.scene_renderer {
                 scene_renderer.set_msaa_count(self.state.msaa_count());
                 scene_renderer.rebuild_pipelines(self.surface.config(), &self.context.device);
-            }   
+            }
             self.state.set_rebuild_bundles(false);
         }
 
@@ -107,7 +110,7 @@ impl<'a> App<'a> {
         }
 
         let frame = self.surface.acquire(&self.context);
-        
+
         let view = frame.texture.create_view(&TextureViewDescriptor {
             format: Some(self.surface.config().view_formats[0]),
             ..TextureViewDescriptor::default()
@@ -115,9 +118,9 @@ impl<'a> App<'a> {
 
         let mut smaa_frame = None;
         if let Some(smaa_target) = &mut self.smaa_target {
-            smaa_frame = Some(smaa_target.start_frame(&self.context.device, &self.context.queue, &view));
+            smaa_frame =
+                Some(smaa_target.start_frame(&self.context.device, &self.context.queue, &view));
         }
-
 
         let mut encoder = self
             .context
@@ -160,11 +163,20 @@ impl<'a> App<'a> {
         if let Some(smaa_frame) = smaa_frame {
             smaa_frame.resolve();
         }
-        
+
         frame.present();
 
         self.frame_counter.update();
-        self.state.set_current_frame_time(self.frame_counter.frame_time());
+        self.state
+            .set_current_frame_time(self.frame_counter.frame_time());
+        self.state.set_n_primitives_in_fragment_storage(
+            self.scene_renderer
+                .as_ref()
+                .unwrap()
+                .cache
+                .compty_fragments_index_map
+                .len(),
+        );
     }
 
     fn create_msaa_view(&mut self) {
@@ -178,7 +190,6 @@ impl<'a> App<'a> {
         self.msaa_view = Some(msaa_texture);
     }
 
-
     pub fn create_smaa_target(&mut self) {
         let smaa_target = SmaaTarget::new(
             &self.context.device,
@@ -186,10 +197,8 @@ impl<'a> App<'a> {
             self.surface.config().width,
             self.surface.config().height,
             self.surface.config().view_formats[0],
-            self.state.smaa_mode()
+            self.state.smaa_mode(),
         );
         self.smaa_target = Some(smaa_target);
     }
-
-    
 }

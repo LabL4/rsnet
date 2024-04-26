@@ -1,7 +1,4 @@
-use nalgebra::{
-    Matrix4, MatrixView3x1,
-    Perspective3, U1, U4,
-};
+use nalgebra::{Matrix4, MatrixView3x1, Perspective3, U1, U4};
 
 use crate::utils::AaBb;
 

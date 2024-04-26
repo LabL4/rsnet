@@ -6,7 +6,7 @@ use crate::utils::frame_counter::FrameCounter;
 use crate::utils::wgpu::{Context, SurfaceWrapper};
 
 use std::sync::Arc;
-use tracing_subscriber::{fmt, filter::EnvFilter, prelude::*};
+use tracing_subscriber::{filter::EnvFilter, fmt, prelude::*};
 use winit::dpi::LogicalSize;
 use winit::event::{Event, KeyEvent, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoopWindowTarget};
@@ -74,31 +74,30 @@ pub async fn run() {
         }
     }
 
-    let _ = (event_loop_function)(window_loop.event_loop, event_handler(window_loop.window, surface, context));
+    let _ = (event_loop_function)(
+        window_loop.event_loop,
+        event_handler(window_loop.window, surface, context),
+    );
 }
 
-fn event_handler<'a>(window: Arc<Window>, surface: SurfaceWrapper<'a>, context: Context) -> impl FnMut(Event<()>, &EventLoopWindowTarget<()>) -> () + 'a
-{
-    
+fn event_handler<'a>(
+    window: Arc<Window>,
+    surface: SurfaceWrapper<'a>,
+    context: Context,
+) -> impl FnMut(Event<()>, &EventLoopWindowTarget<()>) -> () + 'a {
     // let mut frame_counter = FrameCounter::new();
-    
-    
-    
+
     let mut app = App::new(None, None, surface, context, window.clone());
 
     move |event: Event<()>, target: &EventLoopWindowTarget<()>| {
-
         target.set_control_flow(ControlFlow::Poll);
 
         match event {
             ref e if SurfaceWrapper::start_condition(e) => {
                 app.surface.resume(&app.context, window.clone(), true);
 
-                let scene_renderer = Renderer::new(
-                    &app.surface.config(),
-                    &app.context.device,
-                );
-                
+                let scene_renderer = Renderer::new(&app.surface.config(), &app.context.device);
+
                 let gui_renderer = GuiRenderer::new(
                     &app.context.device,
                     app.surface.config().view_formats[0],
@@ -108,23 +107,27 @@ fn event_handler<'a>(window: Arc<Window>, surface: SurfaceWrapper<'a>, context: 
 
                 app.scene_renderer = Some(scene_renderer);
                 app.gui_renderer = Some(gui_renderer);
-                
-            },
+            }
             Event::Suspended => {
                 app.surface.suspend();
-            },
+            }
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::Resized(size) => {
                     app.surface.resize(&app.context, size);
                     app.resize(size);
                     app.window.request_redraw();
-                },
+                }
                 WindowEvent::KeyboardInput {
-                    event: KeyEvent { logical_key: Key::Named(NamedKey::Escape), ..},
+                    event:
+                        KeyEvent {
+                            logical_key: Key::Named(NamedKey::Escape),
+                            ..
+                        },
                     ..
-                } | WindowEvent::CloseRequested => {
+                }
+                | WindowEvent::CloseRequested => {
                     target.exit();
-                },
+                }
                 #[cfg(not(target_arch = "wasm32"))]
                 WindowEvent::KeyboardInput {
                     event:
@@ -135,7 +138,7 @@ fn event_handler<'a>(window: Arc<Window>, surface: SurfaceWrapper<'a>, context: 
                     ..
                 } if s == "r" => {
                     println!("{:#?}", app.context.instance.generate_report());
-                },
+                }
                 WindowEvent::RedrawRequested => {
                     // frame_counter.update();
 

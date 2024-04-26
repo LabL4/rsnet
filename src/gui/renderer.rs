@@ -1,6 +1,6 @@
 use egui::Context;
-use egui_wgpu::ScreenDescriptor;
 use egui_wgpu::Renderer;
+use egui_wgpu::ScreenDescriptor;
 use egui_winit::{EventResponse, State};
 use wgpu::{CommandEncoder, Device, Queue, TextureFormat, TextureView};
 use winit::{event::WindowEvent, window::Window};
@@ -57,7 +57,7 @@ impl GuiRenderer {
         window_msaa_view: Option<&TextureView>,
         window_surface_view: &TextureView,
         screen_descriptor: ScreenDescriptor,
-        run_ui: impl FnOnce(&Context)
+        run_ui: impl FnOnce(&Context),
     ) {
         let raw_input = self.state.take_egui_input(window);
         let context = self.state.egui_ctx();
@@ -79,8 +79,16 @@ impl GuiRenderer {
             .update_buffers(&device, &queue, encoder, &tris, &screen_descriptor);
         let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: if window_msaa_view.is_some() { window_msaa_view.unwrap() } else { window_surface_view },
-                resolve_target: if window_msaa_view.is_some() { Some(window_surface_view) } else { None },
+                view: if window_msaa_view.is_some() {
+                    window_msaa_view.unwrap()
+                } else {
+                    window_surface_view
+                },
+                resolve_target: if window_msaa_view.is_some() {
+                    Some(window_surface_view)
+                } else {
+                    None
+                },
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Load,
                     store: wgpu::StoreOp::Store,

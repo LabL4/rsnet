@@ -21,7 +21,6 @@ impl WidgetSystem for TopPanel {
         context: Option<&egui::Context>,
         id: crate::gui::state::WidgetId,
     ) {
-
         if !context.is_some() {
             return;
         }
@@ -31,17 +30,19 @@ impl WidgetSystem for TopPanel {
         let state = ui_state.get_widget_state_mut::<Self>(id);
         egui::TopBottomPanel::top("Top Panel").show(context, |ui| {
             ui.horizontal(|ui| {
-                if ui.selectable_label(state.settings_open, "Settings").clicked() {
+                if ui
+                    .selectable_label(state.settings_open, "Settings")
+                    .clicked()
+                {
                     state.settings_open = !state.settings_open;
                 }
-    
+
                 if ui.selectable_label(state.debug_open, "Debug").clicked() {
                     state.debug_open = !state.debug_open;
                 }
             });
-
         });
-        
+
         let state = ui_state.get_widget_state::<Self>(id);
         let settings_open = state.settings_open;
         let debug_open = state.debug_open;
@@ -52,7 +53,13 @@ impl WidgetSystem for TopPanel {
                 .collapsible(true)
                 .open(&mut open)
                 .show(context, |ui| {
-                    widget::<Settings>(app_state, ui_state, Some(ui), Some(context), WidgetId::new("Settings"));
+                    widget::<Settings>(
+                        app_state,
+                        ui_state,
+                        Some(ui),
+                        Some(context),
+                        WidgetId::new("Settings"),
+                    );
                 });
             if !open {
                 let state = ui_state.get_widget_state_mut::<Self>(id);
@@ -66,7 +73,13 @@ impl WidgetSystem for TopPanel {
                 .collapsible(true)
                 .open(&mut open)
                 .show(context, |ui| {
-                    widget::<crate::gui::builder::debug_gui::DebugGui>(app_state, ui_state, Some(ui), Some(context), WidgetId::new("Debug"));
+                    widget::<crate::gui::builder::debug_gui::DebugGui>(
+                        app_state,
+                        ui_state,
+                        Some(ui),
+                        Some(context),
+                        WidgetId::new("Debug"),
+                    );
                 });
             if !open {
                 let state = ui_state.get_widget_state_mut::<Self>(id);

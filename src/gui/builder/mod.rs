@@ -1,6 +1,6 @@
+mod debug_gui;
 mod settings;
 mod top_panel;
-mod debug_gui;
 
 use crate::{app, gui};
 

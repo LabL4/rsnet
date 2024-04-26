@@ -5,7 +5,10 @@ use super::shared::*;
 use encase::{internal::WriteInto, ShaderType, StorageBuffer, UniformBuffer};
 use std::{fmt::Debug, num::NonZeroU32};
 use tracing::info;
-use wgpu::{core::binding_model::BindGroupDescriptor, util::DeviceExt, BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, Buffer, Device};
+use wgpu::{
+    core::binding_model::BindGroupDescriptor, util::DeviceExt, BindGroup, BindGroupLayout,
+    BindGroupLayoutDescriptor, Buffer, Device,
+};
 
 const SHADER_ROOT: &'static str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/shaders/");
 
@@ -141,7 +144,7 @@ impl<T: ShaderType + WriteInto> StorageBufferData<T> {
                 device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     contents: &self.scratch.as_ref(),
                     label: Some("Storage Buffer"),
-                    usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                    usage: self.buffer_usage,
                 }),
             );
             self.changed = false;
@@ -452,16 +455,15 @@ macro_rules! chunk_data_uniform_bind_group_layout_descriptor {
                 },
                 visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
             }],
-        }        
+        }
     };
 }
 
 impl ChunkDataUniform {
-
     pub fn create_bind_group(
         device: &Device,
         layout: &BindGroupLayout,
-        buffer: &Buffer
+        buffer: &Buffer,
     ) -> BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("ChunkDataUniform bind group"),
@@ -480,11 +482,12 @@ impl ChunkDataUniform {
             contents: &encase_buffer.as_ref(),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
-    
-        let bind_group_layout = device.create_bind_group_layout(&chunk_data_uniform_bind_group_layout_descriptor!());
-    
+
+        let bind_group_layout =
+            device.create_bind_group_layout(&chunk_data_uniform_bind_group_layout_descriptor!());
+
         let bind_group = Self::create_bind_group(device, &bind_group_layout, &buffer);
-    
+
         Self {
             uniform_buffer_data: UniformBufferData {
                 uniform: chunk_data,

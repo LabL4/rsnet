@@ -33,6 +33,10 @@ impl WidgetSystem for DebugGui {
                 ui.label("FPS");
                 ui.label(format!("{:.1}", 1e3 / frame_time));
                 ui.end_row();
+
+                ui.label("Num of primitives in storage buffer");
+                ui.label(format!("{}", app_state.n_primitives_in_fragment_storage()));
+                ui.end_row();
             });
     }
 

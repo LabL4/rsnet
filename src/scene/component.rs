@@ -9,7 +9,7 @@ use nalgebra::Vector2;
 pub enum Range {
     Near,
     Mid,
-    Far
+    Far,
 }
 
 pub type ComponentType = u32;
@@ -28,7 +28,13 @@ pub struct Component {
 }
 
 impl Component {
-    pub fn new(id: u32, attachment: u32, position: Vector2<f32>, rotation: f32, ty: ComponentType) -> Component {
+    pub fn new(
+        id: u32,
+        attachment: u32,
+        position: Vector2<f32>,
+        rotation: f32,
+        ty: ComponentType,
+    ) -> Component {
         Component {
             range: Range::Mid,
             ty: ty,
@@ -36,7 +42,7 @@ impl Component {
             attachment: attachment,
             position: position,
             rotation: rotation,
-            scale: 1.0
+            scale: 1.0,
         }
     }
 
@@ -59,6 +65,4 @@ impl Component {
     pub fn ty(&self) -> ComponentType {
         self.ty
     }
-
 }
-

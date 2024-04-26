@@ -1,34 +1,67 @@
+pub mod common; // Common set of primitives (Memristor, Resistor, etc)
 pub mod pipeline;
+pub mod render;
 pub mod shared;
 pub mod utils;
-pub mod common; // Common set of primitives (Memristor, Resistor, etc)
-pub mod render;
 
 use nalgebra::Vector2;
 use tracing::info;
 
 use self::shared::*;
 
+#[derive(Debug, Clone, Copy)]
+pub enum PortType {
+    In,
+    Out,
+    InOut,
+}
+
+#[derive(Debug, Clone)]
+pub struct Port {
+    relative_position: Vector2<f32>,
+    name: String,
+    ty: PortType,
+}
+
 #[derive(Debug)]
 pub struct ComponentTyPrimitives {
     pub circles: Vec<CirclePrimitive>,
     pub lines: Vec<LinePrimitive>,
     pub rectangles: Vec<RectanglePrimitive>,
-    pub triangles: Vec<TrianglePrimitive>
+    pub triangles: Vec<TrianglePrimitive>,
+
+    pub ports: Vec<Port>,
 }
 
 impl ComponentTyPrimitives {
-    pub fn to_fragments(&self) -> (
+    pub fn to_fragments(
+        &self,
+    ) -> (
         Vec<CircleFragment>,
         Vec<LineFragment>,
         Vec<RectangleFragment>,
-        Vec<TriangleFragment>
+        Vec<TriangleFragment>,
     ) {
-
-        let circles = self.circles.iter().flat_map(|circle| circle.to_fragments()).collect();
-        let lines = self.lines.iter().flat_map(|line| line.to_fragments()).collect();
-        let rectangles = self.rectangles.iter().flat_map(|rectangle| rectangle.to_fragments()).collect();
-        let triangles = self.triangles.iter().flat_map(|triangle| triangle.to_fragments()).collect();
+        let circles = self
+            .circles
+            .iter()
+            .flat_map(|circle| circle.to_fragments())
+            .collect();
+        let lines = self
+            .lines
+            .iter()
+            .flat_map(|line| line.to_fragments())
+            .collect();
+        let rectangles = self
+            .rectangles
+            .iter()
+            .flat_map(|rectangle| rectangle.to_fragments())
+            .collect();
+        let triangles = self
+            .triangles
+            .iter()
+            .flat_map(|triangle| triangle.to_fragments())
+            .collect();
 
         (circles, lines, rectangles, triangles)
     }
@@ -38,18 +71,16 @@ impl ComponentTyPrimitives {
 pub struct CirclePrimitive {
     pub position: Vector2<f32>,
     pub radius: f32,
-    pub color: u32
+    pub color: u32,
 }
 
 impl CirclePrimitive {
     pub fn to_fragments(&self) -> Vec<CircleFragment> {
-        vec![
-            CircleFragment {
-                position: self.position,
-                radius: self.radius,
-                color: self.color
-            }
-        ]
+        vec![CircleFragment {
+            position: self.position,
+            radius: self.radius,
+            color: self.color,
+        }]
     }
 }
 
@@ -58,7 +89,7 @@ pub struct LinePrimitive {
     pub positions: Vec<Vector2<f32>>,
     pub line_cap_ty: u32,
     pub thickness: f32,
-    pub color: u32
+    pub color: u32,
 }
 
 impl LinePrimitive {
@@ -74,13 +105,20 @@ impl LinePrimitive {
                 end,
                 thickness: self.thickness,
                 line_cap_ty: self.line_cap_ty,
-                ty: if i == 0 { 1 } else if i == self.positions.len() - 2 { 2 } else { 0 },
-                color: self.color
+                ty: if i == 0 {
+                    1
+                } else if i == self.positions.len() - 2 {
+                    2
+                } else {
+                    0
+                },
+                color: self.color,
             });
         }
 
+        // Only one line fragment
         if self.positions.len() == 2 {
-            fragments.get_mut(0).as_mut().unwrap().ty = 3;
+            fragments.first_mut().unwrap().ty = 3;
         }
 
         if self.positions.len() == 1 {
@@ -92,7 +130,7 @@ impl LinePrimitive {
                 thickness: self.thickness,
                 line_cap_ty: self.line_cap_ty,
                 ty: 3,
-                color: self.color
+                color: self.color,
             });
         }
 
@@ -106,18 +144,16 @@ impl LinePrimitive {
 pub struct RectanglePrimitive {
     pub position: Vector2<f32>,
     pub size: Vector2<f32>,
-    pub color: u32
+    pub color: u32,
 }
 
 impl RectanglePrimitive {
     pub fn to_fragments(&self) -> Vec<RectangleFragment> {
-        vec![
-            RectangleFragment {
-                position: self.position,
-                size: self.size,
-                color: self.color
-            }
-        ]        
+        vec![RectangleFragment {
+            position: self.position,
+            size: self.size,
+            color: self.color,
+        }]
     }
 }
 
@@ -131,13 +167,11 @@ pub struct TrianglePrimitive {
 
 impl TrianglePrimitive {
     pub fn to_fragments(&self) -> Vec<TriangleFragment> {
-        vec![
-            TriangleFragment {
-                position: self.position,
-                size: self.size,
-                dir_vec: self.dir_vec,
-                color: self.color
-            }
-        ]        
+        vec![TriangleFragment {
+            position: self.position,
+            size: self.size,
+            dir_vec: self.dir_vec,
+            color: self.color,
+        }]
     }
 }

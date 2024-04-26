@@ -1,15 +1,16 @@
 use super::camera::Camera;
 use crate::{app::utils::chunk_size_from_step_idx, utils::AaBb};
 
+use nalgebra::{
+    ComplexField, Matrix4, Perspective3, Point3, RealField, UnitQuaternion, Vector2, Vector3,
+};
 use std::f32::consts::FRAC_PI_2;
-use nalgebra::{ComplexField, Matrix4, Perspective3, Point3, RealField, UnitQuaternion, Vector2, Vector3};
 use tracing::info;
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
     event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent},
     keyboard::ModifiersState,
 };
-
 
 #[derive(Default, Debug, Eq, PartialEq)]
 enum ButtonState {
@@ -179,7 +180,8 @@ impl CameraController {
         let chunk_size_step = 100.0;
         let base_chunk_size = 10.0;
 
-        let (chunk_size, chunk_step_idx) = chunk_size_from_radius(radius, chunk_size_step, base_chunk_size);
+        let (chunk_size, chunk_step_idx) =
+            chunk_size_from_radius(radius, chunk_size_step, base_chunk_size);
 
         Self {
             mouse_drag_state,
@@ -211,7 +213,7 @@ impl CameraController {
             chunk_size,
             chunk_step_idx,
             chunk_size_step,
-            base_chunk_size
+            base_chunk_size,
         }
     }
 
@@ -291,12 +293,13 @@ impl CameraController {
         }
 
         self.radius = self.radius.max(MIN_RADIUS).min(MAX_RADIUS);
-        
-        let (chunk_size, chunk_step_idx) = chunk_size_from_radius(self.radius, self.chunk_size_step, self.base_chunk_size);
+
+        let (chunk_size, chunk_step_idx) =
+            chunk_size_from_radius(self.radius, self.chunk_size_step, self.base_chunk_size);
         self.chunk_size = chunk_size;
         self.chunk_step_idx = chunk_step_idx;
 
-        self.update_view_matrix();        
+        self.update_view_matrix();
     }
 
     fn update_mouse_press(&mut self, state: ElementState, button: MouseButton) {
@@ -338,10 +341,10 @@ impl CameraController {
         view_matrix[(1, 3)] = translation.y;
         view_matrix[(2, 3)] = translation.z - self.radius;
 
-
         self.camera.set_view_matrix(view_matrix);
-        
-        self.screen_world_aabb = get_ss_aabb(&self.camera.get_perspective(), self.radius, &self.center);
+
+        self.screen_world_aabb =
+            get_ss_aabb(&self.camera.get_perspective(), self.radius, &self.center);
         self.camera.set_aabb(self.screen_world_aabb.clone());
 
         self.is_dirty = true;
@@ -471,8 +474,7 @@ fn check_button_drag(
 pub fn unproject_point<T: RealField>(perspective: &Perspective3<T>, p: &Point3<T>) -> Point3<T> {
     let znear = perspective.znear();
     let perspective = perspective.as_matrix();
-    let inverse_denom =
-        perspective[(2, 3)].clone() / (p[2].clone() + perspective[(2, 2)].clone());
+    let inverse_denom = perspective[(2, 3)].clone() / (p[2].clone() + perspective[(2, 2)].clone());
 
     Point3::new(
         p[0].clone() * inverse_denom.clone() / perspective[(0, 0)].clone(),
@@ -495,7 +497,7 @@ fn mouse_diff_from_radius(
     );
 
     let start_unproj = unproject_point(&perspective, &mouse_ndc);
-    
+
     let start = start_unproj * radius;
     let end = start_unproj * new_radius;
 
@@ -517,7 +519,14 @@ pub fn get_ss_aabb(perspective: &Perspective3<f32>, radius: f32, center: &Vector
     }
 }
 
-pub fn chunk_size_from_radius(radius: f32, chunk_size_step: f32, base_chunk_size: f32) -> (f32, usize) {
+pub fn chunk_size_from_radius(
+    radius: f32,
+    chunk_size_step: f32,
+    base_chunk_size: f32,
+) -> (f32, usize) {
     let chunk_step_idx = (radius.log(10.0).round() - 1.0) as usize;
-    (chunk_size_from_step_idx(chunk_step_idx as u32), (chunk_step_idx as i32 - 1).max(0) as usize)
+    (
+        chunk_size_from_step_idx(chunk_step_idx as u32),
+        (chunk_step_idx as i32 - 1).max(0) as usize,
+    )
 }

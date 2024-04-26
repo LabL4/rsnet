@@ -9,7 +9,6 @@ use winit::{
     window::Window,
 };
 
-
 pub struct SurfaceWrapper<'a> {
     surface: Option<wgpu::Surface<'a>>,
     config: Option<wgpu::SurfaceConfiguration>,

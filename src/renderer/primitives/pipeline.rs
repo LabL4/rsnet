@@ -25,7 +25,7 @@ impl Vertex {
                 //     shader_location: 1,
                 //     format: wgpu::VertexFormat::Uint32,
                 // }
-            ]
+            ],
         }
     }
 }
@@ -35,11 +35,10 @@ pub struct VertexBuffer<'a> {
     pub label: Option<String>,
     // pub scratch: Option<Vec<Vertex>>,
     pub buffer: Option<wgpu::Buffer>,
-    pub buffer_layout: wgpu::VertexBufferLayout<'a>
+    pub buffer_layout: wgpu::VertexBufferLayout<'a>,
 }
 
 impl VertexBuffer<'_> {
-
     pub fn get(&self) -> &Vec<Vertex> {
         &self.value
     }
@@ -61,20 +60,20 @@ impl VertexBuffer<'_> {
     }
 
     pub fn write(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
-
         let capacity: u64 = self.buffer.as_ref().map(wgpu::Buffer::size).unwrap_or(0);
         let byte_data = bytemuck::cast_slice(self.value.as_slice());
 
         if capacity < byte_data.len() as u64 {
-            self.buffer = Some(device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: self.label.as_deref(),
-                contents: byte_data,
-                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            }));
+            self.buffer = Some(
+                device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: self.label.as_deref(),
+                    contents: byte_data,
+                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                }),
+            );
         } else {
             queue.write_buffer(self.buffer.as_ref().unwrap(), 0, byte_data);
         }
-
     }
 }
 
@@ -101,7 +100,8 @@ impl VertexBuffer<'_> {
 //     }
 // }
 
-pub fn create_primitive_pipeline(config: &SurfaceConfiguration,
+pub fn create_primitive_pipeline(
+    config: &SurfaceConfiguration,
     device: &Device,
     msaa_samples: u32,
     common_uniform_bind_group_layout: &wgpu::BindGroupLayout,
@@ -109,12 +109,17 @@ pub fn create_primitive_pipeline(config: &SurfaceConfiguration,
     scene_storage_bind_group_layout: &wgpu::BindGroupLayout,
     fragments_data_uniform_bind_group_layout: &wgpu::BindGroupLayout,
 ) -> wgpu::RenderPipeline {
-    create_primitive_pipeline_unnamed(config, device, msaa_samples, &[
-        common_uniform_bind_group_layout,
-        fragments_storage_bind_group_layout,
-        scene_storage_bind_group_layout,
-        fragments_data_uniform_bind_group_layout,
-    ])
+    create_primitive_pipeline_unnamed(
+        config,
+        device,
+        msaa_samples,
+        &[
+            common_uniform_bind_group_layout,
+            fragments_storage_bind_group_layout,
+            scene_storage_bind_group_layout,
+            fragments_data_uniform_bind_group_layout,
+        ],
+    )
 }
 
 pub fn create_primitive_pipeline_unnamed(
@@ -126,7 +131,6 @@ pub fn create_primitive_pipeline_unnamed(
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("Primitive shader"),
         source: wgpu::ShaderSource::Wgsl(include_shader!("primitives/primitive.wgsl").into()),
-
     });
 
     // let a = "";
@@ -141,7 +145,7 @@ pub fn create_primitive_pipeline_unnamed(
     });
 
     // let vertex_layouts = &[ Vertex::desc() ];
-    let vertex_layouts = &[ ];
+    let vertex_layouts = &[];
     let color_format = config.format;
     let depth_format = None;
 
@@ -151,7 +155,7 @@ pub fn create_primitive_pipeline_unnamed(
         vertex: wgpu::VertexState {
             module: &shader,
             entry_point: "vs_main",
-            buffers: vertex_layouts
+            buffers: vertex_layouts,
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,

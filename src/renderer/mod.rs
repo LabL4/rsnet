@@ -10,7 +10,6 @@ use primitives::{
     common::*,
     pipeline::create_primitive_pipeline,
     shared::{FragmentsDataUniform, FragmentsStorage},
-    utils::{attach_fragment_data_uniform, attach_fragment_storage},
 };
 use shared::*;
 use utils::*;
@@ -20,8 +19,8 @@ use crate::{
     scene::{
         self,
         shared::{
-            create_scene_storage_bind_group, ComponentBufferEntry,
-            SceneStorage, WireSegmentBufferEntry,
+            create_scene_storage_bind_group, ComponentBufferEntry, SceneStorage,
+            WireSegmentBufferEntry,
         },
         utils::{chunk_id_from_position, ChunkId, ChunkRange, ChunkSize},
         Scene,
@@ -37,7 +36,7 @@ use std::{
     primitive,
     sync::{Arc, Mutex},
 };
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 use wgpu::{
     CommandEncoder, Device, Queue, RenderPassColorAttachment, RenderPassDescriptor,
     SurfaceConfiguration, TextureView,
@@ -66,13 +65,10 @@ pub struct Cache {
     /// This is a cache of the number of components in the scene, batched by type.
     pub n_components_by_type: HashMap<u32, usize>,
     pub chunk_range: Option<ChunkRange>,
-    // Maps a componet type to an array of indices in fragments storage buffer,
-    // each index in the array corresponds to a Level of detail, being 0 the highest
-    pub fragments_comptype_index_map:
+    /// Maps a componet type to an array of indices in fragments storage buffer,
+    /// each index in the array corresponds to a Level of detail, 0 being the highest
+    pub compty_fragments_index_map:
         HashMap<u32, Vec<(u32, f32 /*This is the maximum camera distance*/)>>,
-    // pub last_lod_for_type: HashMap<u32, u32>,
-
-    //
     pub scene_chunk_step_idx: u32,
 }
 
@@ -116,6 +112,8 @@ impl<'a> Renderer<'a> {
                 // &NMOS_PRIMITIVES_L0,
             ],
         );
+
+        // info!("fragments_storage: {:#?}", fragments_storage.component_ty_fragments.get());
 
         let fragments_data_uniform = FragmentsDataUniform::attach(device);
 
@@ -172,7 +170,9 @@ impl<'a> Renderer<'a> {
         //     .insert(1, vec![(2, 400.0)]);
         // cache
         //     .fragments_comptype_index_map
-        //     .insert(2, vec![(3, 400.0)]);
+        //     .insert(2, vec![(0, 400.0)]);
+
+        // info!("fragments_comptype_index_map: {:#?}", cache.fragments_comptype_index_map);
 
         // cache
         //     .fragments_comptype_index_map
@@ -448,41 +448,71 @@ impl<'a> Renderer<'a> {
         let fragments_storage = &mut self.shared.fragments_storage;
         let mut write = false;
 
-
-        // This says in wich index of the fragments storage buffer is each type of component
-        for (ty, _) in self.cache.n_components_by_type.iter() {
-            if self.cache.fragments_comptype_index_map.get(ty).is_none() {
-                println!("Getting primitives for type: {}", ty);
-                match scene.primitives().get(ty) {
+        // Add primitives to the fragments storage
+        for (compty, _) in self.cache.n_components_by_type.iter() {
+            if self.cache.compty_fragments_index_map.get(compty).is_none() {
+                match scene.primitives().get(compty) {
                     Some(primitives) => {
                         write = true;
                         for (primitive, max_dist) in primitives {
                             fragments_storage.add_primitives(primitive);
-                            
-                            let mut idx_entry = self.cache.fragments_comptype_index_map.entry(*ty).or_insert(vec![]);
-                            idx_entry.push(
-                                (
-                                    (fragments_storage.component_ty_fragments.get().len() - 1) as u32,
-                                    *max_dist
-                                )
-                            )
+
+                            let mut idx_entry = self
+                                .cache
+                                .compty_fragments_index_map
+                                .entry(*compty)
+                                .or_insert(vec![]);
+                            idx_entry.push((
+                                (fragments_storage.component_ty_fragments.get().len() - 1) as u32,
+                                *max_dist,
+                            ));
                         }
-                    },
-                    None => {}
+                    }
+                    None => {
+                        // TODO: Add an unknown primitive for rendering in this situation
+                    }
                 };
-                // self.cache
-                //     .fragments_index_map
-                //     .insert(el.0, vec![(0, 400.0), (1, 1200.0)]);
             }
         }
 
-        println!("fragments_comptype_index_map: {:#?}", self.cache.fragments_comptype_index_map);
+        // Remove primitives from the fragments storage
+        let mut to_remove_idx = Vec::new();
+        self.cache
+            .compty_fragments_index_map
+            .retain(|ty, indices| {
+                if self.cache.n_components_by_type.get(ty).is_none() {
+                    write = true;
 
+                    to_remove_idx.append(
+                        &mut indices
+                            .iter()
+                            .map(|(idx, _)| *idx as usize)
+                            .collect::<Vec<usize>>(),
+                    );
+                    
+                    return false;
+                }
 
+                true
+            });
+
+        to_remove_idx.iter().for_each(|remove_idx| {
+            self.cache.compty_fragments_index_map.iter_mut().for_each(|(ty, indices)| {
+                indices.iter_mut().for_each(|(idx_in_fragments, _max_dist)|{
+                    if (*remove_idx as u32) < *idx_in_fragments {
+                        *idx_in_fragments = *idx_in_fragments - 1;
+                    }
+                });
+            });
+        });
+
+        fragments_storage.remove_primitives(to_remove_idx);
+        
         if write {
             fragments_storage.write(device, queue);
         }
     }
+
 
     /// This function checks if the scene has changed, and updates the GPU buffer if it has.
     fn check_and_update_scene_storage(
@@ -729,58 +759,7 @@ impl<'a> Renderer<'a> {
             self.cache.n_components_by_type.retain(|_, n| *n > 0);
 
             if n_aditions + n_deletions > 0 {
-                // self.shared.scene_storage.components.set(components.clone());
-                let prev_comp_size = self
-                    .shared
-                    .scene_storage
-                    .components
-                    .get_scratch()
-                    .as_ref()
-                    .len();
-
-                let prev_wire_size = self
-                    .shared
-                    .scene_storage
-                    .wire_segments
-                    .get_scratch()
-                    .as_ref()
-                    .len();
-
-                self.shared
-                    .scene_storage
-                    .components
-                    .write_buffer(device, queue);
-
-                self.shared
-                    .scene_storage
-                    .wire_segments
-                    .write_buffer(device, queue);
-
-                let comp_size = self
-                    .shared
-                    .scene_storage
-                    .components
-                    .get_scratch()
-                    .as_ref()
-                    .len();
-
-                let wire_size = self
-                    .shared
-                    .scene_storage
-                    .wire_segments
-                    .get_scratch()
-                    .as_ref()
-                    .len();
-
-                if prev_comp_size != comp_size || prev_wire_size != wire_size {
-                    //prev_size != self.shared.scene_storage.components.get_scratch().as_ref().len() {
-                    self.shared.scene_storage.bind_group = create_scene_storage_bind_group(
-                        device,
-                        &self.shared.scene_storage.bind_group_layout,
-                        self.shared.scene_storage.components.buffer().unwrap(),
-                        self.shared.scene_storage.wire_segments.buffer().unwrap(),
-                    );
-                }
+                self.shared.scene_storage.write(device, queue);
             }
         }
     }
@@ -792,21 +771,6 @@ impl<'a> Renderer<'a> {
         self.shared.scene_storage.components.set(Vec::new());
         self.shared.scene_storage.wire_segments.set(Vec::new());
 
-        self.shared
-            .scene_storage
-            .components
-            .write_buffer(device, queue);
-
-        self.shared
-            .scene_storage
-            .wire_segments
-            .write_buffer(device, queue);
-
-        self.shared.scene_storage.bind_group = create_scene_storage_bind_group(
-            device,
-            &self.shared.scene_storage.bind_group_layout,
-            self.shared.scene_storage.components.buffer().unwrap(),
-            self.shared.scene_storage.wire_segments.buffer().unwrap(),
-        );
+        self.shared.scene_storage.write(device, queue);
     }
 }

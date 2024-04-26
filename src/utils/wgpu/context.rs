@@ -22,7 +22,7 @@ impl Context {
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends,
-            flags: wgpu::InstanceFlags::from_build_config().with_env(),// | wgpu::InstanceFlags::debugging(),
+            flags: wgpu::InstanceFlags::from_build_config().with_env(), // | wgpu::InstanceFlags::debugging(),
             dx12_shader_compiler,
             gles_minor_version,
         });

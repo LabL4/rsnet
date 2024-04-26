@@ -14,13 +14,14 @@ enum MsaaCount {
     Two,
     Four,
     Eight,
+    Sixteen
 }
 
 fn smaa_mode_to_str<'a>(mode: &'a SmaaMode) -> &'a str {
     match mode {
         SmaaMode::Disabled => "Disabled",
         SmaaMode::Smaa1X => "1x",
-        _ => "Disabled"
+        _ => "Disabled",
     }
 }
 
@@ -32,6 +33,7 @@ impl From<u32> for MsaaCount {
             2 => MsaaCount::Two,
             4 => MsaaCount::Four,
             8 => MsaaCount::Eight,
+            16 => MsaaCount::Sixteen,
             _ => MsaaCount::One,
         }
     }
@@ -44,6 +46,7 @@ impl MsaaCount {
             MsaaCount::Two => 2,
             MsaaCount::Four => 4,
             MsaaCount::Eight => 8,
+            MsaaCount::Sixteen => 16,
         }
     }
 }
@@ -51,14 +54,14 @@ impl MsaaCount {
 #[derive(Widget)]
 pub struct AaSelector {
     msaa_count: MsaaCount,
-    smaa_mode: SmaaMode
+    smaa_mode: SmaaMode,
 }
 
 impl Default for AaSelector {
     fn default() -> Self {
         Self {
             msaa_count: MsaaCount::One,
-            smaa_mode: SmaaMode::Disabled
+            smaa_mode: SmaaMode::Disabled,
         }
     }
 }
@@ -91,6 +94,7 @@ impl WidgetSystem for AaSelector {
                 ui.selectable_value(msaa_count, MsaaCount::Two, "2");
                 ui.selectable_value(msaa_count, MsaaCount::Four, "4");
                 ui.selectable_value(msaa_count, MsaaCount::Eight, "8");
+                ui.selectable_value(msaa_count, MsaaCount::Sixteen, "16");
             });
 
         ui.end_row();
@@ -105,7 +109,6 @@ impl WidgetSystem for AaSelector {
                 ui.selectable_value(smaa_mode, SmaaMode::Smaa1X, "1x");
             });
 
-
         if msaa_count.to_u32() != app_state.msaa_count() {
             app_state.set_msaa_count(msaa_count.to_u32());
         }
@@ -113,10 +116,6 @@ impl WidgetSystem for AaSelector {
         if smaa_mode != &app_state.smaa_mode() {
             app_state.set_smaa_mode(*smaa_mode);
         }
-
-
-
-
     }
 
     fn init(&mut self, app_state: &mut app::State) {

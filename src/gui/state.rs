@@ -72,7 +72,11 @@ pub fn widget<S: 'static + Widget + Default>(
         S::system(app_state, ui_state, ui, context, id);
     } else {
         // print type name of cached_state
-        panic!("Widget state type mismatch for id {:?} and type {:?}", id, std::any::type_name::<S>());
+        panic!(
+            "Widget state type mismatch for id {:?} and type {:?}",
+            id,
+            std::any::type_name::<S>()
+        );
     }
 
     // S::system(app_state, cached_state, ui, id);

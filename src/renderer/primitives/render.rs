@@ -1,10 +1,10 @@
 use super::{
+    shared::{FragmentsData, FragmentsDataUniform, FragmentsStorage},
     utils::attach_fragment_data_uniform,
-    shared::{FragmentsData, FragmentsDataUniform, FragmentsStorage}
 };
 
-use crate::renderer::Cache;
 use crate::app::camera::CameraController;
+use crate::renderer::Cache;
 use crate::utils::wgpu::Context;
 
 use std::collections::{HashMap, HashSet};
@@ -42,7 +42,8 @@ pub fn render<'b, 'c>(
     // Draw each batch
     let mut n_rendered = 0;
     for (fragments_idx, ty) in fragments_type_vec.iter() {
-        let component_ty_fragments = &fragments_storage.component_ty_fragments.get()[*fragments_idx as usize];
+        let component_ty_fragments =
+            &fragments_storage.component_ty_fragments.get()[*fragments_idx as usize];
         let n_fragments = component_ty_fragments.n_fragments();
 
         let n_components = cache.n_components_by_type.get(ty).unwrap();
@@ -53,7 +54,7 @@ pub fn render<'b, 'c>(
             &[],
         );
 
-        // info!("Rendering {} fragments for type {} for {} components", n_fragments, ty, n_components);
+        info!("Rendering {} fragments for type {} for {} components", n_fragments, ty, n_components);
 
         render_pass.draw(
             0..(n_fragments * 6),
@@ -73,10 +74,10 @@ fn check_and_update_fragments_data_uniforms(
 ) -> Vec<(u32, u32)> {
     let mut fragments_type_vec = vec![(0u32, 0u32); cache.n_components_by_type.len()];
     let mut positions = HashSet::<u32>::new();
-    
+
     for (idx, (ty, _n_components)) in cache.n_components_by_type.iter().enumerate() {
         let mut fragments_idx = match cache
-            .fragments_comptype_index_map
+            .compty_fragments_index_map
             .get(ty)
             .unwrap()
             .binary_search_by_key(&(camera_controller.radius() as usize), |v| v.1 as usize)
@@ -85,30 +86,28 @@ fn check_and_update_fragments_data_uniforms(
             Err(i) => i,
         };
 
-        if fragments_idx >= cache.fragments_comptype_index_map.get(ty).unwrap().len() {
+        if fragments_idx >= cache.compty_fragments_index_map.get(ty).unwrap().len() {
             // fragment_idx = cache.fragments_index_map.get(ty).unwrap().len() - 1;
             continue;
         }
 
-        
-        fragments_idx = cache.fragments_comptype_index_map.get(ty).unwrap()[fragments_idx].0 as usize;
-        
-        println!("fragments_idx: {}", fragments_idx);
+        fragments_idx =
+            cache.compty_fragments_index_map.get(ty).unwrap()[fragments_idx].0 as usize;
 
-        if *ty == 0 {
-            // info!("Fragments idx for 0 is {}", fragments_idx);
-        }
+        // if *ty == 0 {
+        // info!("Fragments idx for 0 is {}", fragments_idx);
+        // }
 
         match fragments_data_uniform_map.get_mut(ty) {
             Some(fragments_data_uniform) => {
-                let prev_fragment_idx =
-                    fragments_data_uniform.buffer.uniform.fragments_idx;
+                let prev_fragment_idx = fragments_data_uniform.buffer.uniform.fragments_idx;
 
                 if prev_fragment_idx != fragments_idx as u32 {
                     // info!("Prev was {}, new is {}", prev_fragment_idx, fragments_idx);
                     let fragments_data = FragmentsData {
                         fragments_idx: fragments_idx as u32,
                     };
+
                     fragments_data_uniform.buffer.set(fragments_data);
                     // .write(&fragments_data)
                     // .unwrap();
@@ -138,14 +137,11 @@ fn check_and_update_fragments_data_uniforms(
 
         fragments_type_vec[idx] = (fragments_idx as u32, *ty);
         positions.insert(*ty as u32);
-
     }
 
     // info!("Positions: {:?}", positions);
 
-    fragments_type_vec.retain(|(_fragments_idx, ty)| {
-        positions.contains(ty)
-    });
+    fragments_type_vec.retain(|(_fragments_idx, ty)| positions.contains(ty));
 
     // sort by ty
     fragments_type_vec.sort_by(|a, b| a.1.cmp(&b.1));

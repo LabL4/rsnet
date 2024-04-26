@@ -1,5 +1,5 @@
 use tracing::info;
-use wgpu::{RenderPass, RenderPipeline, BindGroup};
+use wgpu::{BindGroup, RenderPass, RenderPipeline};
 
 use crate::scene::shared::SceneStorage;
 

@@ -1,5 +1,3 @@
-
-
 pub fn create_multisampled_framebuffer(
     device: &wgpu::Device,
     config: &wgpu::SurfaceConfiguration,

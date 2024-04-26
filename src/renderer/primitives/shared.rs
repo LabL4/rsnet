@@ -1,3 +1,5 @@
+use std::thread::panicking;
+
 use encase::ShaderType;
 use nalgebra::Vector2;
 use tracing::info;
@@ -5,12 +7,15 @@ use wgpu::{
     util::DeviceExt, BindGroup, BindGroupLayout, BindGroupLayoutDescriptor, Buffer, Device, Queue,
 };
 
-use crate::renderer::{
-    primitives::utils::{
-        attach_buffer, component_primitives_vec_to_fragments,
-        fragments_bind_group_layout_descriptor,
+use crate::{
+    renderer::{
+        primitives::utils::{
+            attach_buffer, component_primitives_vec_to_fragments,
+            fragments_bind_group_layout_descriptor,
+        },
+        uniform_as_wgsl_bytes, StorageBufferData, UniformBufferData,
     },
-    uniform_as_wgsl_bytes, StorageBufferData, UniformBufferData,
+    utils::retain_by_range,
 };
 
 use super::ComponentTyPrimitives;
@@ -84,64 +89,6 @@ pub struct FragmentsStorage {
 }
 
 impl FragmentsStorage {
-    pub fn bind_group_layout_descriptor<'a>() -> BindGroupLayoutDescriptor<'a> {
-        BindGroupLayoutDescriptor {
-            label: Some("Fragments storage bind group layout"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    count: None,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    visibility: wgpu::ShaderStages::VERTEX,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    count: None,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    visibility: wgpu::ShaderStages::VERTEX,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    count: None,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    visibility: wgpu::ShaderStages::VERTEX,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 3,
-                    count: None,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    visibility: wgpu::ShaderStages::VERTEX,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 4,
-                    count: None,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    visibility: wgpu::ShaderStages::VERTEX,
-                },
-            ],
-        }
-    }
-
     pub fn create_bind_group(
         device: &Device,
         layout: &BindGroupLayout,
@@ -238,6 +185,74 @@ impl FragmentsStorage {
         }
     }
 
+    pub fn remove_primitives(&mut self, mut indices: Vec<usize>) {
+        indices.sort_by(|a, b| b.cmp(a));
+
+        // if !indices.is_empty() {
+        //     println!("--------------");
+        //     println!("component_ty_fragments: {:#?}", self.component_ty_fragments.get());
+        // }
+
+        for idx in indices.iter() {
+            let removed_comp_fragments = self.component_ty_fragments.get_mut().remove(*idx);
+
+            self.component_ty_fragments
+                .get_mut()
+                .iter_mut()
+                .for_each(|comp_fragments| {
+                    if comp_fragments.circles_start > removed_comp_fragments.circles_start {
+                        comp_fragments.circles_start -= removed_comp_fragments.n_circles;
+                    }
+
+                    if comp_fragments.lines_start > removed_comp_fragments.lines_start {
+                        comp_fragments.lines_start -= removed_comp_fragments.n_lines;
+                    }
+
+                    if comp_fragments.rectangles_start > removed_comp_fragments.rectangles_start {
+                        comp_fragments.rectangles_start -= removed_comp_fragments.n_rectangles;
+                    }
+
+                    if comp_fragments.triangles_start > removed_comp_fragments.triangles_start {
+                        comp_fragments.triangles_start -= removed_comp_fragments.n_triangles;
+                    }
+                });
+
+            self.circle_fragments.get_mut().drain(
+                (removed_comp_fragments.circles_start as usize)
+                    ..(removed_comp_fragments.circles_start + removed_comp_fragments.n_circles)
+                        as usize,
+            );
+
+            self.line_fragments.get_mut().drain(
+                (removed_comp_fragments.lines_start as usize)
+                    ..(removed_comp_fragments.lines_start + removed_comp_fragments.n_lines)
+                        as usize,
+            );
+
+            self.rectangle_fragments.get_mut().drain(
+                (removed_comp_fragments.rectangles_start as usize)
+                    ..(removed_comp_fragments.rectangles_start
+                        + removed_comp_fragments.n_rectangles) as usize,
+            );
+
+            self.triangles_fragments.get_mut().drain(
+                (removed_comp_fragments.triangles_start as usize)
+                    ..(removed_comp_fragments.triangles_start + removed_comp_fragments.n_triangles)
+                        as usize,
+            );
+            // println!("triangles_fragments len: {:#?}", self.triangles_fragments.get().len());
+        }
+
+        // if !indices.is_empty() {
+        //     println!("component_ty_fragments: {:#?}", self.component_ty_fragments.get());
+        //     println!("circle_fragments len: {:#?}", self.circle_fragments.get().len());
+        //     println!("line_fragments len: {:#?}", self.line_fragments.get().len());
+        //     println!("rectangle_fragments len: {:#?}", self.rectangle_fragments.get().len());
+        //     println!("triangles_fragments len: {:#?}", self.triangles_fragments.get().len());
+        // }
+
+    }
+
     pub fn add_primitives(&mut self, primitives: &ComponentTyPrimitives) {
         let (circle_fragments, line_fragments, rectangle_fragments, triangle_fragments) =
             primitives.to_fragments();
@@ -245,24 +260,35 @@ impl FragmentsStorage {
         let component_ty_fragments = ComponentTyFragments {
             circles_start: self.circle_fragments.get().len() as u32,
             n_circles: circle_fragments.len() as u32,
+
             lines_start: self.line_fragments.get().len() as u32,
             n_lines: line_fragments.len() as u32,
+
             rectangles_start: self.rectangle_fragments.get().len() as u32,
             n_rectangles: rectangle_fragments.len() as u32,
+
             triangles_start: self.triangles_fragments.get().len() as u32,
             n_triangles: triangle_fragments.len() as u32,
         };
 
-        self.component_ty_fragments.get_mut().push(
-            component_ty_fragments
-        );
+        // println!("Line fragments: \n{:?}", line_fragments);
+        // for line in line_fragments.iter() {
+        //     println!("Line: {:?}", line);
+        // }
+
+        self.component_ty_fragments
+            .get_mut()
+            .push(component_ty_fragments);
 
         self.circle_fragments.get_mut().extend(circle_fragments);
         self.line_fragments.get_mut().extend(line_fragments);
-        self.rectangle_fragments.get_mut().extend(rectangle_fragments);
-        self.triangles_fragments.get_mut().extend(triangle_fragments);
+        self.rectangle_fragments
+            .get_mut()
+            .extend(rectangle_fragments);
+        self.triangles_fragments
+            .get_mut()
+            .extend(triangle_fragments);
 
-        
         //     lines_start: self.line_fragments.data.len() as u32,
         //     n_lines: lines.len() as u32,
 
@@ -281,6 +307,9 @@ impl FragmentsStorage {
         // self.line_fragments.data.extend(lines);
         // self.rectangle_fragments.data.extend(rectangles);
         // self.triangles_fragments.data.extend(triangles);
+
+        // if !indices.is_empty() {
+        // }
     }
 
     pub fn write(&mut self, device: &Device, queue: &Queue) {
@@ -291,20 +320,21 @@ impl FragmentsStorage {
             self.circle_fragments.write_buffer(device, queue),
             self.line_fragments.write_buffer(device, queue),
             self.rectangle_fragments.write_buffer(device, queue),
-            self.triangles_fragments.write_buffer(device, queue)];
+            self.triangles_fragments.write_buffer(device, queue),
+        ];
 
-        if new_bg.iter().any(|v| *v) {
+        // if new_bg.iter().any(|v| *v) {
+        if true {
             self.bind_group = Self::create_bind_group(
                 device,
                 &self.bind_group_layout,
                 self.component_ty_fragments.buffer().unwrap(),
                 self.circle_fragments.buffer().unwrap(),
                 self.line_fragments.buffer().unwrap(),
+                self.rectangle_fragments.buffer().unwrap(),
                 self.triangles_fragments.buffer().unwrap(),
-                self.rectangle_fragments.buffer().unwrap()
             );
         }
-
     }
 }
 

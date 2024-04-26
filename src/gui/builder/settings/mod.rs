@@ -23,14 +23,19 @@ impl WidgetSystem for Settings {
         let ui = ui.unwrap();
 
         egui::Grid::new("my_grid")
-                .num_columns(2)
-                .spacing([40.0, 4.0])
-                .striped(true)
-                .show(ui, |ui| {
-                    widget::<AaSelector>(app_state, ui_state, Some(ui), context, WidgetId::new("Aa Selector"));
-                    ui.end_row();
-                });
-
+            .num_columns(2)
+            .spacing([40.0, 4.0])
+            .striped(true)
+            .show(ui, |ui| {
+                widget::<AaSelector>(
+                    app_state,
+                    ui_state,
+                    Some(ui),
+                    context,
+                    WidgetId::new("Aa Selector"),
+                );
+                ui.end_row();
+            });
     }
 
     fn init(&mut self, app_state: &mut crate::app::State)

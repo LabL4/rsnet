@@ -29,9 +29,9 @@ impl FrameCounter {
         if elapsed_secs > 1.0 {
             let elapsed_ms = elapsed_secs * 1000.0;
             let frame_time = elapsed_ms / self.frame_count as f32;
-            
+
             self.frame_time = frame_time;
-            
+
             let fps = self.frame_count as f32 / elapsed_secs;
             // info!("Frame time {:.2}ms ({:.1} FPS)", frame_time, fps);
 

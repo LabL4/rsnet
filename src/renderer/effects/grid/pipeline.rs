@@ -8,12 +8,15 @@ pub fn create_pipeline(
     device: &Device,
     msaa_count: u32,
 ) -> wgpu::RenderPipeline {
-
     let common_uniforms_layout = common_uniforms_layout(device);
     let time_data_layout = time_data_layout(device);
     let chunk_data_layout = chunk_data_layout(device);
 
-    let bind_group_layouts = [&common_uniforms_layout, &time_data_layout, &chunk_data_layout];
+    let bind_group_layouts = [
+        &common_uniforms_layout,
+        &time_data_layout,
+        &chunk_data_layout,
+    ];
 
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("Main shader"),
@@ -36,7 +39,7 @@ pub fn create_pipeline(
         vertex: wgpu::VertexState {
             module: &shader,
             entry_point: "vs_main",
-            buffers: vertex_layouts
+            buffers: vertex_layouts,
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,

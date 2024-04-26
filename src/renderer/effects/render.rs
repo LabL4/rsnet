@@ -1,4 +1,4 @@
-use wgpu::{RenderPass, RenderPipeline, BindGroup};
+use wgpu::{BindGroup, RenderPass, RenderPipeline};
 
 pub fn render<'b, 'c>(
     render_pass: &mut RenderPass<'c>,

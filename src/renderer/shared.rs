@@ -1,14 +1,14 @@
-use crate::app::camera::Camera;
 use super::{uniform_as_wgsl_bytes, utils::UniformBufferData};
+use crate::app::camera::Camera;
 
 use encase::ShaderType;
-use nalgebra::{Vector2, Matrix4};
+use nalgebra::{Matrix4, Vector2};
 use wgpu::{util::DeviceExt, Device};
 
 #[derive(Debug, ShaderType, Default)]
 pub struct MouseUniform {
     /// Screen space position of the mouse [-1, 1]
-    pub pos: Vector2<f32>
+    pub pos: Vector2<f32>,
 }
 
 #[derive(Debug, Copy, Clone, ShaderType, Default)]
@@ -76,7 +76,7 @@ pub struct CommonUniforms {
     pub camera: UniformBufferData<CameraUniform>,
     pub window: UniformBufferData<WindowUniform>,
     pub bind_group: wgpu::BindGroup,
-    pub bind_group_layout: wgpu::BindGroupLayout
+    pub bind_group_layout: wgpu::BindGroupLayout,
 }
 
 macro_rules! common_uniforms_bind_group_layout_descriptor {
@@ -120,36 +120,35 @@ macro_rules! common_uniforms_bind_group_layout_descriptor {
 }
 
 impl CommonUniforms {
-
     pub fn attach(device: &Device) -> Self {
         let camera_uniform = CameraUniform::default();
         let mouse_uniform = MouseUniform::default();
         let window_uniform = WindowUniform::default();
-        
+
         let camera_encase_buffer = uniform_as_wgsl_bytes(&camera_uniform).unwrap();
         let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(format!("{} buffer", "Camera").as_str()),
             contents: &camera_encase_buffer.as_ref(),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
-    
+
         let mouse_encase_buffer = uniform_as_wgsl_bytes(&mouse_uniform).unwrap();
         let mouse_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(format!("{} buffer", "Mouse").as_str()),
             contents: &mouse_encase_buffer.as_ref(),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
-    
+
         let window_encase_buffer = uniform_as_wgsl_bytes(&window_uniform).unwrap();
         let window_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(format!("{} buffer", "Window").as_str()),
             contents: &window_encase_buffer.as_ref(),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
-    
-        let bind_group_layout = device.create_bind_group_layout(
-            &common_uniforms_bind_group_layout_descriptor!());
-    
+
+        let bind_group_layout =
+            device.create_bind_group_layout(&common_uniforms_bind_group_layout_descriptor!());
+
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some(format!("{} bind group", "uniforms").as_str()),
             layout: &bind_group_layout,
@@ -168,7 +167,7 @@ impl CommonUniforms {
                 },
             ],
         });
-    
+
         Self {
             mouse: UniformBufferData {
                 uniform: mouse_uniform,

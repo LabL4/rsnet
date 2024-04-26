@@ -4,7 +4,8 @@ use crate::renderer::utils::{storage_as_wgsl_bytes, StorageBufferData};
 
 use encase::ShaderType;
 use nalgebra::{Matrix3, Vector2};
-use wgpu::{util::DeviceExt, Device};
+use rayon::vec;
+use wgpu::{util::DeviceExt, BindGroup, BindGroupLayout, Device, Queue};
 
 /// This will be the buffer that holds all the components for the entities
 #[derive(ShaderType, Debug, Default, Clone)]
@@ -85,6 +86,46 @@ pub struct SceneStorage {
 }
 
 impl SceneStorage {
+    pub fn write(&mut self, device: &Device, queue: &Queue) {
+        let mut new_bg = false;
+
+        let new_bg = vec![
+            self.components.write_buffer(device, queue),
+            self.wire_segments.write_buffer(device, queue),
+        ];
+
+        if new_bg.iter().any(|v| *v) {
+            self.bind_group = Self::create_bind_group(
+                device,
+                &self.bind_group_layout,
+                self.components.buffer().unwrap(),
+                self.wire_segments.buffer().unwrap(),
+            );
+        }
+    }
+
+    pub fn create_bind_group(
+        device: &Device,
+        layout: &BindGroupLayout,
+        components_buffer: &wgpu::Buffer,
+        wire_segments_buffer: &wgpu::Buffer,
+    ) -> BindGroup {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Scene storage bind group"),
+            layout: layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: components_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wire_segments_buffer.as_entire_binding(),
+                },
+            ],
+        })
+    }
+
     pub fn attach_empty(device: &Device) -> Self {
         let mut components = StorageBufferData::empty(Vec::new());
         components.set_label(Some("Components storage buffer"));
