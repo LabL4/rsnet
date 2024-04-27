@@ -14,7 +14,7 @@ enum MsaaCount {
     Two,
     Four,
     Eight,
-    Sixteen
+    Sixteen,
 }
 
 fn smaa_mode_to_str<'a>(mode: &'a SmaaMode) -> &'a str {

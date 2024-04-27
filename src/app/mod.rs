@@ -90,7 +90,7 @@ impl<'a> App<'a> {
         self.camera_controller.resize(size);
     }
 
-    pub fn render(&mut self) {
+    fn render(&mut self) {
         if self.state.rebuild_bundles() {
             if self.state.msaa_count() != 1 {
                 self.create_msaa_view();
@@ -166,6 +166,9 @@ impl<'a> App<'a> {
 
         frame.present();
 
+    }
+
+    fn update_state(&mut self) {
         self.frame_counter.update();
         self.state
             .set_current_frame_time(self.frame_counter.frame_time());
@@ -177,6 +180,44 @@ impl<'a> App<'a> {
                 .compty_fragments_index_map
                 .len(),
         );
+        self.state.set_n_wires_in_buffer(
+            self.scene_renderer
+                .as_ref()
+                .unwrap()
+                .shared
+                .scene_storage
+                .wires
+                .get()
+                .len(),
+        );
+        self.state.set_n_components_in_buffer(
+            self.scene_renderer
+                .as_ref()
+                .unwrap()
+                .shared
+                .scene_storage
+                .components
+                .get()
+                .len(),
+        );
+        self.state.set_screen_chunk_range(
+            self.scene_renderer
+                .as_ref()
+                .unwrap()
+                .cache
+                .chunk_range.clone().unwrap()
+        );
+        self.state.set_chunk_step_idx(
+            self.camera_controller.chunk_step_idx
+        );
+        self.state.set_chunk_size(
+            self.camera_controller.chunk_size
+        );
+    }
+
+    pub fn present(&mut self) {
+        self.render();
+        self.update_state();
     }
 
     fn create_msaa_view(&mut self) {

@@ -1,4 +1,8 @@
-use super::{component::Component, wire::WireSegment, ChunkId};
+use super::{
+    component::Component,
+    wire::{Wire, WireSegment},
+    ChunkId,
+};
 
 use crate::renderer::utils::{storage_as_wgsl_bytes, StorageBufferData};
 
@@ -42,18 +46,16 @@ impl ComponentBufferEntry {
 }
 
 #[derive(ShaderType, Debug, Default, Clone)]
-pub struct WireSegmentBufferEntry {
+pub struct WireBufferEntry {
     pub id: u32,
-    pub wire_id: u32,
     pub start: Vector2<f32>,
     pub end: Vector2<f32>,
 }
 
-impl WireSegmentBufferEntry {
-    pub fn from_wire_segment(segment: &WireSegment) -> Self {
+impl WireBufferEntry {
+    pub fn from_wire(segment: &Wire) -> Self {
         Self {
             id: segment.id(),
-            wire_id: segment.wire_id(),
             start: segment.start().clone(),
             end: segment.end().clone(),
         }
@@ -61,10 +63,6 @@ impl WireSegmentBufferEntry {
 
     pub fn id(&self) -> u32 {
         self.id
-    }
-
-    pub fn wire_id(&self) -> u32 {
-        self.wire_id
     }
 
     pub fn start(&self) -> &Vector2<f32> {
@@ -79,7 +77,7 @@ impl WireSegmentBufferEntry {
 /// The Scene struct contains tdxe full Scene data, and the SceneStorage struct contains the data
 /// that is used to render the visible part of the scene.
 pub struct SceneStorage {
-    pub wire_segments: StorageBufferData<Vec<WireSegmentBufferEntry>>,
+    pub wires: StorageBufferData<Vec<WireBufferEntry>>,
     pub components: StorageBufferData<Vec<ComponentBufferEntry>>,
     pub bind_group: wgpu::BindGroup,
     pub bind_group_layout: wgpu::BindGroupLayout,
@@ -91,7 +89,7 @@ impl SceneStorage {
 
         let new_bg = vec![
             self.components.write_buffer(device, queue),
-            self.wire_segments.write_buffer(device, queue),
+            self.wires.write_buffer(device, queue),
         ];
 
         if new_bg.iter().any(|v| *v) {
@@ -99,7 +97,7 @@ impl SceneStorage {
                 device,
                 &self.bind_group_layout,
                 self.components.buffer().unwrap(),
-                self.wire_segments.buffer().unwrap(),
+                self.wires.buffer().unwrap(),
             );
         }
     }
@@ -187,7 +185,7 @@ impl SceneStorage {
         );
 
         SceneStorage {
-            wire_segments,
+            wires: wire_segments,
             components,
             bind_group,
             bind_group_layout,

@@ -3,9 +3,8 @@ struct Component {
     id: u32,
     ty: u32,
 }
-struct WireSegment {
+struct Wire {
     id: u32,
-    wire_id: u32,
     start: vec2<f32>,
     end: vec2<f32>,
 }
@@ -13,4 +12,4 @@ struct WireSegment {
 @group($bg) @binding(0)
 var<storage, read> components: array<Component>;
 @group($bg) @binding(1)
-var<storage, read> wire_segments: array<WireSegment>;
+var<storage, read> wires: array<Wire>;

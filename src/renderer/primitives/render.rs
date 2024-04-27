@@ -54,7 +54,10 @@ pub fn render<'b, 'c>(
             &[],
         );
 
-        info!("Rendering {} fragments for type {} for {} components", n_fragments, ty, n_components);
+        info!(
+            "Rendering {} fragments for type {} for {} components",
+            n_fragments, ty, n_components
+        );
 
         render_pass.draw(
             0..(n_fragments * 6),
@@ -91,8 +94,7 @@ fn check_and_update_fragments_data_uniforms(
             continue;
         }
 
-        fragments_idx =
-            cache.compty_fragments_index_map.get(ty).unwrap()[fragments_idx].0 as usize;
+        fragments_idx = cache.compty_fragments_index_map.get(ty).unwrap()[fragments_idx].0 as usize;
 
         // if *ty == 0 {
         // info!("Fragments idx for 0 is {}", fragments_idx);

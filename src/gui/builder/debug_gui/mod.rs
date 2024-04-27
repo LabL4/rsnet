@@ -1,6 +1,6 @@
 use rsnet_derive::Widget;
 
-use crate::gui::state::WidgetSystem;
+use crate::{app, gui::state::WidgetSystem};
 
 #[derive(Default, Widget)]
 pub struct DebugGui {}
@@ -37,6 +37,27 @@ impl WidgetSystem for DebugGui {
                 ui.label("Num of primitives in storage buffer");
                 ui.label(format!("{}", app_state.n_primitives_in_fragment_storage()));
                 ui.end_row();
+
+                ui.label("Num of wires in storage buffer");
+                ui.label(format!("{}", app_state.n_wires_in_buffer()));
+                ui.end_row();
+
+                ui.label("Num of components in storage buffer");
+                ui.label(format!("{}", app_state.n_components_in_buffer()));
+                ui.end_row();
+
+                ui.label("Chunk step idx");
+                ui.label(format!("{}", app_state.chunk_step_idx()));
+                ui.end_row();
+
+                ui.label("Chunk size");
+                ui.label(format!("{:.2}", app_state.chunk_size()));
+                ui.end_row();
+
+                ui.label("Screen chunk range");
+                ui.label(format!("{:?}, {:?}", app_state.screen_chunk_range().min_chunk, app_state.screen_chunk_range().max_chunk));
+                ui.end_row();
+
             });
     }
 

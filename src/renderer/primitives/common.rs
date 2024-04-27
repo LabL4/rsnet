@@ -137,7 +137,7 @@ lazy_static!(
         central_line.push(Vector2::new(-RESISTOR_WIDTH / 2.0, central_line.last().unwrap().y - DIV_LENGTH * 2.0));
         central_line.push(Vector2::new(0.0, central_line.last().unwrap().y - DIV_LENGTH));
 
-        
+
 
         let mut top_terminal: Vec<Vector2<f32>> = vec![];
 

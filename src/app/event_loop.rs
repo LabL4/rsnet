@@ -142,7 +142,7 @@ fn event_handler<'a>(
                 WindowEvent::RedrawRequested => {
                     // frame_counter.update();
 
-                    app.render();
+                    app.present();
 
                     app.window.request_redraw();
                 }

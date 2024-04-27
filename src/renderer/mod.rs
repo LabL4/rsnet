@@ -19,14 +19,13 @@ use crate::{
     scene::{
         self,
         shared::{
-            create_scene_storage_bind_group, ComponentBufferEntry, SceneStorage,
-            WireSegmentBufferEntry,
+            create_scene_storage_bind_group, ComponentBufferEntry, SceneStorage, WireBufferEntry,
         },
         utils::{chunk_id_from_position, ChunkId, ChunkRange, ChunkSize},
         Scene,
     },
     timed,
-    utils::{insert_ordered_at, wgpu::context::Context, WindowSize},
+    utils::{insert_ordered_at, wgpu::context::Context, Id, WindowSize},
 };
 
 use rayon::prelude::*;
@@ -477,42 +476,44 @@ impl<'a> Renderer<'a> {
 
         // Remove primitives from the fragments storage
         let mut to_remove_idx = Vec::new();
-        self.cache
-            .compty_fragments_index_map
-            .retain(|ty, indices| {
-                if self.cache.n_components_by_type.get(ty).is_none() {
-                    write = true;
+        self.cache.compty_fragments_index_map.retain(|ty, indices| {
+            if self.cache.n_components_by_type.get(ty).is_none() {
+                write = true;
 
-                    to_remove_idx.append(
-                        &mut indices
-                            .iter()
-                            .map(|(idx, _)| *idx as usize)
-                            .collect::<Vec<usize>>(),
-                    );
-                    
-                    return false;
-                }
+                to_remove_idx.append(
+                    &mut indices
+                        .iter()
+                        .map(|(idx, _)| *idx as usize)
+                        .collect::<Vec<usize>>(),
+                );
 
-                true
-            });
+                return false;
+            }
+
+            true
+        });
 
         to_remove_idx.iter().for_each(|remove_idx| {
-            self.cache.compty_fragments_index_map.iter_mut().for_each(|(ty, indices)| {
-                indices.iter_mut().for_each(|(idx_in_fragments, _max_dist)|{
-                    if (*remove_idx as u32) < *idx_in_fragments {
-                        *idx_in_fragments = *idx_in_fragments - 1;
-                    }
+            self.cache
+                .compty_fragments_index_map
+                .iter_mut()
+                .for_each(|(ty, indices)| {
+                    indices
+                        .iter_mut()
+                        .for_each(|(idx_in_fragments, _max_dist)| {
+                            if (*remove_idx as u32) < *idx_in_fragments {
+                                *idx_in_fragments = *idx_in_fragments - 1;
+                            }
+                        });
                 });
-            });
         });
 
         fragments_storage.remove_primitives(to_remove_idx);
-        
+
         if write {
             fragments_storage.write(device, queue);
         }
     }
-
 
     /// This function checks if the scene has changed, and updates the GPU buffer if it has.
     fn check_and_update_scene_storage(
@@ -549,10 +550,10 @@ impl<'a> Renderer<'a> {
 
             // debug!("Visible chunks changed, updating components, ({}, {}), ({}, {})", min_chunk.0, min_chunk.1, max_chunk.0, max_chunk.1);
             let scene_components = scene.components().get(&(chunk_step_idx as u32));
-            let scene_wire_segments = scene.wire_segments().get(&(chunk_step_idx as u32));
+            let scene_wires = scene.wire_segments().get(&(chunk_step_idx as u32));
 
             let mut components = self.shared.scene_storage.components.get_mut();
-            let mut wire_segments = self.shared.scene_storage.wire_segments.get_mut();
+            let mut wire_buffer = self.shared.scene_storage.wires.get_mut();
             let n_components_by_type = &mut self.cache.n_components_by_type;
 
             let (in_self_not_other, in_other_not_self) =
@@ -589,7 +590,7 @@ impl<'a> Renderer<'a> {
             // to_remove is a vec of (id, type)
             // let to_remove = Arc::new(Mutex::new(Vec::<(u32, u32)>::new()));
             let components_to_remove = Arc::new(Mutex::new(HashMap::<u32, u32>::new()));
-            let wire_segments_to_remove = Arc::new(Mutex::new(HashSet::<u32>::new()));
+            let wires_to_remove = Arc::new(Mutex::new(HashSet::<u32>::new()));
             {
                 // To delete
                 in_self_not_other.iter().for_each(|chunk_id| {
@@ -624,18 +625,28 @@ impl<'a> Renderer<'a> {
                         }
                     }
 
-                    if wire_segments.len() > 0 && scene_wire_segments.is_some() {
-                        let scene_wires = scene_wire_segments.unwrap();
+                    if wire_buffer.len() > 0 && scene_wires.is_some() {
+                        let scene_wires = scene_wires.unwrap();
                         if let Some(chunk) = scene_wires.get(&chunk_id) {
-                            chunk.par_iter().for_each(|wire_segment| {
-                                // insert ordered by id
-                                if let Ok(_idx) = wire_segments
-                                    .binary_search_by(|c| c.id().cmp(&wire_segment.id()))
+                            chunk.par_iter().for_each(|wire_id| {
+                                let wire = scene.wires().get(wire_id).unwrap();
+
+                                let bottom_left = chunk_id_from_position(&wire.start(), chunk_size);
+                                let top_right = chunk_id_from_position(&wire.end(), chunk_size);
+
+                                let wire_range = ChunkRange {
+                                    min_chunk: bottom_left,
+                                    max_chunk: top_right,
+                                };
+
+                                if actual_chunk_range.overlaps(&wire_range) {
+                                    return;
+                                }
+
+                                if let Ok(_idx) =
+                                    wire_buffer.binary_search_by(|w| w.id().cmp(&wire_id))
                                 {
-                                    wire_segments_to_remove
-                                        .lock()
-                                        .unwrap()
-                                        .insert(wire_segment.id());
+                                    wires_to_remove.lock().unwrap().insert(*wire_id);
                                 }
                             });
                         }
@@ -654,8 +665,8 @@ impl<'a> Renderer<'a> {
 
                 components.retain(|comp| !components_to_remove.contains_key(&comp.id()));
 
-                let wire_segments_to_remove = wire_segments_to_remove.lock().unwrap().clone();
-                wire_segments.retain(|wire| !wire_segments_to_remove.contains(&wire.id()));
+                let wires_to_remove = wires_to_remove.lock().unwrap().clone();
+                wire_buffer.retain(|wire| !wires_to_remove.contains(&wire.id()));
             }
 
             // Where to insert and the components to insert
@@ -663,9 +674,9 @@ impl<'a> Renderer<'a> {
                 usize,
                 Vec<ComponentBufferEntry>,
             >::new())));
-            let mut wire_segments_to_insert = Arc::new(Mutex::new(Some(HashMap::<
+            let mut wires_to_insert = Arc::new(Mutex::new(Some(HashMap::<
                 usize,
-                Vec<WireSegmentBufferEntry>,
+                Vec<WireBufferEntry>,
             >::new())));
             {
                 in_other_not_self.iter().for_each(|chunk_id| {
@@ -703,29 +714,28 @@ impl<'a> Renderer<'a> {
                         }
                     }
 
-                    if scene_wire_segments.is_some() {
-                        let scene_wire_segments = scene_wire_segments.unwrap();
+                    if scene_wires.is_some() {
+                        let scene_wires_ids = scene_wires.unwrap();
 
-                        if let Some(chunk) = scene_wire_segments.get(&chunk_id) {
-                            chunk.par_iter().for_each(|wire_segment| {
-                                // insert ordered by type chained with id
-                                if let Err(i) = wire_segments
-                                    .binary_search_by(|ws| ws.id().cmp(&wire_segment.id()))
+                        if let Some(chunk) = scene_wires_ids.get(&chunk_id) {
+                            chunk.par_iter().for_each(|wire_id| {
+                                // insert ordered by id
+                                if let Err(i) =
+                                    wire_buffer.binary_search_by(|w| w.id().cmp(&wire_id))
                                 {
-                                    let mut to_insert = wire_segments_to_insert.lock().unwrap();
+                                    let mut to_insert = wires_to_insert.lock().unwrap();
 
-                                    // to_insert.entry(i).or_insert(Vec::new());
-                                    // let entry = to_insert.get_mut(&i).unwrap();
                                     let entry =
                                         to_insert.as_mut().unwrap().entry(i).or_insert(Vec::new());
 
                                     // Insert in entry ordered by type chained with id
-                                    if let Err(j) =
-                                        entry.binary_search_by(|ws| ws.id().cmp(&wire_segment.id()))
+                                    if let Err(j) = entry.binary_search_by(|w| w.id().cmp(&wire_id))
                                     {
                                         entry.insert(
                                             j,
-                                            WireSegmentBufferEntry::from_wire_segment(wire_segment),
+                                            WireBufferEntry::from_wire(
+                                                scene.wires().get(wire_id).unwrap(),
+                                            ),
                                         );
                                     }
                                 }
@@ -750,8 +760,8 @@ impl<'a> Renderer<'a> {
                     "insert_ordered_at"
                 );
 
-                let to_insert = wire_segments_to_insert.lock().unwrap().take().unwrap();
-                insert_ordered_at(&mut wire_segments, to_insert);
+                let to_insert = wires_to_insert.lock().unwrap().take().unwrap();
+                insert_ordered_at(&mut wire_buffer, to_insert);
             }
 
             self.cache.chunk_range = Some(actual_chunk_range);
@@ -769,7 +779,7 @@ impl<'a> Renderer<'a> {
         self.cache.n_components_by_type.clear();
 
         self.shared.scene_storage.components.set(Vec::new());
-        self.shared.scene_storage.wire_segments.set(Vec::new());
+        self.shared.scene_storage.wires.set(Vec::new());
 
         self.shared.scene_storage.write(device, queue);
     }

@@ -250,7 +250,6 @@ impl FragmentsStorage {
         //     println!("rectangle_fragments len: {:#?}", self.rectangle_fragments.get().len());
         //     println!("triangles_fragments len: {:#?}", self.triangles_fragments.get().len());
         // }
-
     }
 
     pub fn add_primitives(&mut self, primitives: &ComponentTyPrimitives) {

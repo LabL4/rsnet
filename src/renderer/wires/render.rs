@@ -21,7 +21,7 @@ pub fn render<'b, 'c>(
 
     // info!("segments: {:?}", scene_storage.wire_segments.get().len());
 
-    let n_segments = scene_storage.wire_segments.get().len() as u32;
+    let n_segments = scene_storage.wires.get().len() as u32;
 
     render_pass.draw(0..4, 0..n_segments)
 }

@@ -29,7 +29,11 @@ use self::{
     wire::{Wire, WireSegment},
 };
 
-pub type ChunkedStorage<T> = HashMap<u32, HashMap<ChunkId, Vec<T>>>;
+/// This is the "LOD", 0 is the highest detail (component level), only shown when zoomed in
+pub type ChunkStepIdx = u32;
+
+/// Maps a Chunk step index to a ChunkSize
+pub type ChunkedStorage<T> = HashMap<ChunkStepIdx, HashMap<ChunkId, Vec<T>>>;
 
 #[derive(Debug)]
 pub struct Scene {
@@ -37,8 +41,9 @@ pub struct Scene {
     // components: HashMap<ChunkSize, HashMap<ChunkId, Vec<Component>>>,
     components: ChunkedStorage<Component>,
     id_to_chunksize_chunk: HashMap<Id, (ChunkSize, ChunkId)>,
-    wire_segments: ChunkedStorage<WireSegment>,
-    wires: HashMap<u32, Vec<Wire>>,
+    /// Stores the IDs of the wires contained in each chunk
+    wires_chunk_cache: ChunkedStorage<Id>,
+    wires: HashMap<Id, Wire>,
 
     primitives: HashMap<ComponentType, Vec<(&'static ComponentTyPrimitives, f32)>>,
 }
@@ -54,7 +59,7 @@ impl Scene {
         let mut scene = Scene {
             components: HashMap::new(),
             id_to_chunksize_chunk: HashMap::new(),
-            wire_segments: HashMap::new(),
+            wires_chunk_cache: HashMap::new(),
             wires: HashMap::new(),
             primitives: HashMap::new(),
         };
@@ -63,8 +68,8 @@ impl Scene {
         let chunk_step_idx = 0;
 
         // Add 10M components to the scene
-        let n_cols = 4;
-        let n_rows = 2;
+        let n_cols = 2;
+        let n_rows = 1;
 
         let n_cols = 1000;
         let n_rows = 1000;
@@ -77,13 +82,20 @@ impl Scene {
                 // info!("Adding component with id {}", j + i*n_cols);
                 // scene.add_component(chunk_step_idx, Component::new(id, 0, pos, 0.0  , id%3));
                 // scene.add_component(chunk_step_idx, Component::new(id, 0, pos, 0.0, id % 3));
-                scene.add_component(chunk_step_idx, Component::new(id, 0, pos, 0.0, (id-1) % 4));
+                scene.add_component(
+                    chunk_step_idx,
+                    Component::new(id, 0, pos , 0.0, (id - 1) % 4),
+                );
             }
         }
 
+        // println!("components: {:#?}", scene.components);
+
+        let chunk_size = chunk_size_from_step_idx(chunk_step_idx);
+
         scene.add_wire(
             chunk_step_idx,
-            Wire::new(0, Vector2::new(0.0, 0.0), Vector2::new(1000.0, 10000.0)),
+            Wire::new(0, Vector2::new(0.0, 0.0), Vector2::new(100.0, 100.0), chunk_size),
         );
 
         scene.primitives.insert(
@@ -118,11 +130,12 @@ impl Scene {
     }
 
     pub fn add_component(&mut self, chunk_step_idx: u32, component: Component) {
+
         let chunk_id = chunk_id_from_position(
             &component.position(),
-            chunk_size_from_step_idx(chunk_step_idx),
+            chunk_size_from_step_idx(chunk_step_idx+1),
         );
-        // info!("Adding component to chunk: {:?}", chunk_id);
+        // println!("Adding component to chunk (size: {:?}): {:?}", chunk_size_from_step_idx(chunk_step_idx+1), chunk_id);
 
         self.id_to_chunksize_chunk
             .insert(component.id(), (chunk_step_idx, chunk_id));
@@ -164,60 +177,64 @@ impl Scene {
         None
     }
 
-    pub fn wire_segments(&self) -> &ChunkedStorage<WireSegment> {
-        &self.wire_segments
+    pub fn wire_segments(&self) -> &ChunkedStorage<Id> {
+        &self.wires_chunk_cache
+    }
+
+    pub fn wires(&self) -> &HashMap<Id, Wire> {
+        &self.wires
     }
 
     pub fn add_wire(&mut self, chunk_step_idx: u32, wire: Wire) {
-        let wires_vec = self.wires.entry(wire.id()).or_insert(Vec::new());
-        let wire_segments = &mut self.wire_segments;
+        let wire_chunk_cache = &mut self.wires_chunk_cache;
 
-        match wires_vec.binary_search_by_key(&wire.id(), |c| c.id()) {
-            Ok(pos) => {
-                remove_wire_segments(wire_segments, chunk_step_idx, wire.id());
-                add_wire_segments(wire_segments, chunk_step_idx, &wire);
-                wires_vec[pos] = wire;
-            }
-            Err(pos) => {
-                add_wire_segments(wire_segments, chunk_step_idx, &wire);
-                wires_vec.insert(pos, wire);
-            }
-        };
+        if self.wires.contains_key(&wire.id()) {
+            // Remove the wire from the cache
+            remove_wire_from_chunks_cache(wire_chunk_cache, chunk_step_idx, wire.id());
+        }
+        add_wire_to_chunk_cache(wire_chunk_cache, chunk_step_idx, &wire);
+        self.wires.insert(wire.id(), wire);
     }
 }
 
-fn remove_wire_segments(
-    wire_segments: &mut ChunkedStorage<WireSegment>,
-    chunk_step_idx: u32,
-    wire_id: u32,
+fn remove_wire_from_chunks_cache(
+    wire_chunk_cache: &mut ChunkedStorage<Id>,
+    chunk_step_idx: ChunkStepIdx,
+    wire_id: Id,
 ) {
-    wire_segments.remove(&wire_id);
+    if let Some(chunkid_wireids_map) = wire_chunk_cache.get_mut(&chunk_step_idx) {
+        chunkid_wireids_map
+            .iter_mut()
+            .for_each(|(_chunk_id, wire_ids)| {
+                wire_ids
+                    .binary_search(&wire_id)
+                    .map(|pos| wire_ids.remove(pos));
+            });
+    }
 }
 
-fn add_wire_segments(
-    wire_segments: &mut ChunkedStorage<WireSegment>,
-    chunk_step_idx: u32,
+fn add_wire_to_chunk_cache(
+    wire_chunk_cache: &mut ChunkedStorage<Id>,
+    chunk_step_idx: ChunkStepIdx,
     wire: &Wire,
 ) {
-    let this_wire_segments: Vec<(ChunkId, WireSegment)> =
-        wire.to_segments(chunk_size_from_step_idx(chunk_step_idx));
+    let occupied_chunkids: Vec<ChunkId> =
+        wire.occupied_chunks(chunk_size_from_step_idx(chunk_step_idx));
 
-    let chunked_wire_segments = wire_segments.entry(wire.id()).or_insert(HashMap::new());
+    let chunked_wire_ids = wire_chunk_cache.entry(chunk_step_idx).or_insert(HashMap::new());
 
-    this_wire_segments
-        .into_iter()
-        .for_each(|(chunk_id, wire_segment)| {
-            let segments = chunked_wire_segments.entry(chunk_id).or_insert(Vec::new());
+    occupied_chunkids.into_iter().for_each(|chunk_id| {
+        let ids = chunked_wire_ids.entry(chunk_id).or_insert(Vec::new());
 
-            // info!("Adding wire segment to chunk: {:?}", chunk_id);
+        // info!("Adding wire segment to chunk: {:?}", chunk_id);
 
-            match segments.binary_search_by_key(&wire_segment.id(), |w| w.id()) {
-                Ok(pos) => {
-                    segments[pos] = wire_segment;
-                }
-                Err(pos) => {
-                    segments.insert(pos, wire_segment);
-                }
+        match ids.binary_search(&wire.id()) {
+            Ok(pos) => {
+                ids[pos] = wire.id();
             }
-        });
+            Err(pos) => {
+                ids.insert(pos, wire.id());
+            }
+        }
+    });
 }
