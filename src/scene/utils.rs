@@ -246,6 +246,21 @@ mod scene_utils_test {
             assert!(in_other_not_self_target.contains(chunk_id));
         });
     }
+
+    #[test]
+    fn test_chunk_range_overlap_1d() {
+        let range = ChunkRange {
+            min_chunk: (1, 1),
+            max_chunk: (1, 1),
+        };
+
+        let overlaps = range.overlaps(&ChunkRange {
+            min_chunk: (1, 0),
+            max_chunk: (1, 1),
+        });
+
+        assert!(overlaps);
+    }
 }
 
 // pub fn range_diff(range1: ChunkRange, range2: ChunkRange) -> Vec<ChunkId> {

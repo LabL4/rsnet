@@ -631,15 +631,9 @@ impl<'a> Renderer<'a> {
                             chunk.par_iter().for_each(|wire_id| {
                                 let wire = scene.wires().get(wire_id).unwrap();
 
-                                let bottom_left = chunk_id_from_position(&wire.start(), chunk_size);
-                                let top_right = chunk_id_from_position(&wire.end(), chunk_size);
 
-                                let wire_range = ChunkRange {
-                                    min_chunk: bottom_left,
-                                    max_chunk: top_right,
-                                };
 
-                                if actual_chunk_range.overlaps(&wire_range) {
+                                if actual_chunk_range.overlaps(&wire.aabb()) {
                                     return;
                                 }
 

@@ -34,21 +34,44 @@ impl WireSegment {
 #[derive(Debug)]
 pub struct Wire {
     id: u32,
-    // positions: Vec<Vector2<f32>>,
+    
     start: Vector2<f32>,
     end: Vector2<f32>,
+    /// Used to determine the end cap of the wire, at end and start respectively
+    prev_direction: Vector2<f32>,
+    next_direction: Vector2<f32>,
 
-    range: ChunkRange, // node_id: u32
+    /// The AABB of the wire
+    aabb: ChunkRange, // node_id: u32
 }
 
 impl Wire {
-    pub fn new(id: u32, start: Vector2<f32>, end: Vector2<f32>, chunk_size: f32) -> Self {
+    pub fn new(
+        id: u32,
+        start: Vector2<f32>,
+        end: Vector2<f32>,
+        next_direction: Vector2<f32>,
+        prev_direction: Vector2<f32>,
+        chunk_size: f32,
+    ) -> Self {
+
+        let min = Vector2::new(start.x.min(end.x), start.y.min(end.y));
+        let max = Vector2::new(start.x.max(end.x), start.y.max(end.y));
+
         let range = ChunkRange {
-            min_chunk: chunk_id_from_position(&start, chunk_size),
-            max_chunk: chunk_id_from_position(&end, chunk_size)
+            min_chunk: chunk_id_from_position(&min, chunk_size),
+            max_chunk: chunk_id_from_position(&max, chunk_size),
         };
 
-        Wire { id, start, end, range }
+        Wire {
+            id,
+            start,
+            end,
+            prev_direction,
+            next_direction,
+
+            aabb: range,
+        }
     }
 
     pub fn occupied_chunks(&self, chunk_size: f32) -> Vec<ChunkId> {
@@ -134,6 +157,18 @@ impl Wire {
 
     pub fn end(&self) -> &Vector2<f32> {
         &self.end
+    }
+
+    pub fn aabb(&self) -> &ChunkRange {
+        &self.aabb
+    }
+
+    pub fn next_direction(&self) -> &Vector2<f32> {
+        &self.next_direction
+    }
+
+    pub fn prev_direction(&self) -> &Vector2<f32> {
+        &self.prev_direction
     }
 }
 

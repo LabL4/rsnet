@@ -84,7 +84,7 @@ impl Scene {
                 // scene.add_component(chunk_step_idx, Component::new(id, 0, pos, 0.0, id % 3));
                 scene.add_component(
                     chunk_step_idx,
-                    Component::new(id, 0, pos , 0.0, (id - 1) % 4),
+                    Component::new(id, 0, pos, 0.0, (id - 1) % 4),
                 );
             }
         }
@@ -95,7 +95,26 @@ impl Scene {
 
         scene.add_wire(
             chunk_step_idx,
-            Wire::new(0, Vector2::new(0.0, 0.0), Vector2::new(100.0, 100.0), chunk_size),
+            Wire::new(
+                0,
+                Vector2::new(0.0, 0.0),
+                Vector2::new(10.0, 10.0),
+                Vector2::new(1.0, 0.0),
+                Vector2::new(1.0, 1.0),
+                chunk_size,
+            ),
+        );
+
+        scene.add_wire(
+            chunk_step_idx,
+            Wire::new(
+                1,
+                Vector2::new(10.0, 10.0),
+                Vector2::new(20.0, 10.0),
+                Vector2::new(1.0, 0.0),
+                Vector2::new(1.0, 1.0),
+                chunk_size,
+            ),
         );
 
         scene.primitives.insert(
@@ -130,10 +149,9 @@ impl Scene {
     }
 
     pub fn add_component(&mut self, chunk_step_idx: u32, component: Component) {
-
         let chunk_id = chunk_id_from_position(
             &component.position(),
-            chunk_size_from_step_idx(chunk_step_idx+1),
+            chunk_size_from_step_idx(chunk_step_idx + 1),
         );
         // println!("Adding component to chunk (size: {:?}): {:?}", chunk_size_from_step_idx(chunk_step_idx+1), chunk_id);
 
@@ -221,7 +239,9 @@ fn add_wire_to_chunk_cache(
     let occupied_chunkids: Vec<ChunkId> =
         wire.occupied_chunks(chunk_size_from_step_idx(chunk_step_idx));
 
-    let chunked_wire_ids = wire_chunk_cache.entry(chunk_step_idx).or_insert(HashMap::new());
+    let chunked_wire_ids = wire_chunk_cache
+        .entry(chunk_step_idx)
+        .or_insert(HashMap::new());
 
     occupied_chunkids.into_iter().for_each(|chunk_id| {
         let ids = chunked_wire_ids.entry(chunk_id).or_insert(Vec::new());

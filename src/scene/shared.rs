@@ -50,14 +50,18 @@ pub struct WireBufferEntry {
     pub id: u32,
     pub start: Vector2<f32>,
     pub end: Vector2<f32>,
+    pub prev_direction: Vector2<f32>,
+    pub next_direction: Vector2<f32>,
 }
 
 impl WireBufferEntry {
-    pub fn from_wire(segment: &Wire) -> Self {
+    pub fn from_wire(wire: &Wire) -> Self {
         Self {
-            id: segment.id(),
-            start: segment.start().clone(),
-            end: segment.end().clone(),
+            id: wire.id(),
+            start: wire.start().clone(),
+            end: wire.end().clone(),
+            prev_direction: wire.prev_direction().clone(),
+            next_direction: wire.next_direction().clone(),
         }
     }
 

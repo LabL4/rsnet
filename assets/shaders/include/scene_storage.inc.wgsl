@@ -7,6 +7,8 @@ struct Wire {
     id: u32,
     start: vec2<f32>,
     end: vec2<f32>,
+    prev_dir: vec2<f32>,
+    next_dir: vec2<f32>
 }
 
 @group($bg) @binding(0)

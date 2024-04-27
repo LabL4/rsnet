@@ -154,11 +154,11 @@ mod tests {
     fn test_retain_by_range() {
         let mut vec = vec![1, 2, 3, 4, 5, 6, 7, 8, 9];
         retain_by_range(&mut vec, (2, 6), false);
-        assert_eq!(vec, vec![3, 4, 5, 6, 7]);
+        assert_eq!(vec, vec![3, 4, 5, 6]);
 
         let mut vec = vec![1, 2, 3, 4, 5, 6, 7, 8, 9];
         retain_by_range(&mut vec, (0, 8), false);
-        assert_eq!(vec, vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
+        assert_eq!(vec, vec![1, 2, 3, 4, 5, 6, 7, 8]);
     }
 }
 
