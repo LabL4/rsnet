@@ -34,7 +34,7 @@ impl WireSegment {
 #[derive(Debug)]
 pub struct Wire {
     id: u32,
-    
+
     start: Vector2<f32>,
     end: Vector2<f32>,
     /// Used to determine the end cap of the wire, at end and start respectively
@@ -54,7 +54,6 @@ impl Wire {
         prev_direction: Vector2<f32>,
         chunk_size: f32,
     ) -> Self {
-
         let min = Vector2::new(start.x.min(end.x), start.y.min(end.y));
         let max = Vector2::new(start.x.max(end.x), start.y.max(end.y));
 

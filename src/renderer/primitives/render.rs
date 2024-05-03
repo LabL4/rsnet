@@ -8,7 +8,7 @@ use crate::renderer::Cache;
 use crate::utils::wgpu::Context;
 
 use std::collections::{HashMap, HashSet};
-use tracing::info;
+use tracing::{debug, info};
 use wgpu::{Device, Queue};
 
 pub fn render<'b, 'c>(
@@ -54,7 +54,7 @@ pub fn render<'b, 'c>(
             &[],
         );
 
-        info!(
+        debug!(
             "Rendering {} fragments for type {} for {} components",
             n_fragments, ty, n_components
         );

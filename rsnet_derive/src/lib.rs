@@ -89,3 +89,13 @@ pub fn unwrap_or_return_none(input: TokenStream) -> TokenStream {
 pub fn include_shader(input: TokenStream) -> TokenStream {
     renderer::include_shader(input)
 }
+
+#[proc_macro]
+pub fn include_asset(input: TokenStream) -> TokenStream {
+    renderer::include_asset(input)
+}
+
+#[proc_macro]
+pub fn include_asset_bytes(input: TokenStream) -> TokenStream {
+    renderer::include_asset_bytes(input)
+}

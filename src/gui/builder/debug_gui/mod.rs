@@ -55,9 +55,12 @@ impl WidgetSystem for DebugGui {
                 ui.end_row();
 
                 ui.label("Screen chunk range");
-                ui.label(format!("{:?}, {:?}", app_state.screen_chunk_range().min_chunk, app_state.screen_chunk_range().max_chunk));
+                ui.label(format!(
+                    "{:?}, {:?}",
+                    app_state.screen_chunk_range().min_chunk,
+                    app_state.screen_chunk_range().max_chunk
+                ));
                 ui.end_row();
-
             });
     }
 

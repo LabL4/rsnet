@@ -85,6 +85,7 @@ impl Scene {
                 scene.add_component(
                     chunk_step_idx,
                     Component::new(id, 0, pos, 0.0, (id - 1) % 4),
+                    //Component::new(id, 0, pos, 0.0, 3),
                 );
             }
         }

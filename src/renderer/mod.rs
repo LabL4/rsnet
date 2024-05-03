@@ -2,16 +2,17 @@ pub mod effects;
 pub mod primitives;
 pub mod shader;
 pub mod shared;
+pub mod text_renderer;
 pub mod utils;
 pub mod wires;
 
-use md5::digest::consts::True;
 use primitives::{
     common::*,
     pipeline::create_primitive_pipeline,
     shared::{FragmentsDataUniform, FragmentsStorage},
 };
 use shared::*;
+use text_renderer::TextRenderer;
 use utils::*;
 
 use crate::{
@@ -79,11 +80,12 @@ pub struct Renderer<'a> {
     pub msaa_count: u32,
     time: u32,
     last_rendered: std::time::Instant,
+    text_renderer: TextRenderer<'a>,
     phantom: PhantomData<&'a ()>,
 }
 
 impl<'a> Renderer<'a> {
-    pub fn new(config: &SurfaceConfiguration, device: &Device) -> Self {
+    pub fn new(config: &SurfaceConfiguration, device: &Device, queue: &Queue) -> Self {
         let chunk_data_uniform = ChunkDataUniform::attach(
             device,
             ChunkData {
@@ -108,7 +110,7 @@ impl<'a> Renderer<'a> {
                 // &MEMRISTOR_PRIMITIVES_L0,
                 // &MEMRISTOR_PRIMITIVES_L1,
                 // &OMP_AMP_PRIMITIVES_L0,
-                // &NMOS_PRIMITIVES_L0,
+                // &NMOS_PRIMIrTIVES_L0,
             ],
         );
 
@@ -127,6 +129,9 @@ impl<'a> Renderer<'a> {
             &scene_storage.bind_group_layout,
             &fragments_data_uniform.bind_group_layout,
         );
+
+        let text_renderer = TextRenderer::new(config, device, queue, &common_uniforms.bind_group_layout);
+
 
         let grid_effect_pipeline =
             effects::grid::pipeline::create_pipeline(config, device, msaa_count);
@@ -161,25 +166,6 @@ impl<'a> Renderer<'a> {
 
         let mut cache = Cache::default();
 
-        // cache
-        //     .fragments_comptype_index_map
-        //     .insert(0, vec![(0, 400.0), (1, 1200.0)]);
-        // cache
-        //     .fragments_comptype_index_map
-        //     .insert(1, vec![(2, 400.0)]);
-        // cache
-        //     .fragments_comptype_index_map
-        //     .insert(2, vec![(0, 400.0)]);
-
-        // info!("fragments_comptype_index_map: {:#?}", cache.fragments_comptype_index_map);
-
-        // cache
-        //     .fragments_comptype_index_map
-        //     .iter()
-        //     .for_each(|(ty, _)| {
-        //         cache.last_lod_for_type.insert(*ty, 0);
-        //     });
-
         let depth_texture = Texture::create_depth_texture(&device, &config, "depth_texture");
 
         Self {
@@ -190,12 +176,14 @@ impl<'a> Renderer<'a> {
             msaa_count,
             time: 0,
             last_rendered: std::time::Instant::now(),
+            text_renderer,
             phantom: PhantomData,
         }
     }
 
     pub fn set_msaa_count(&mut self, count: u32) {
         self.msaa_count = count;
+        self.text_renderer.set_msaa_count(count);
     }
 
     pub fn rebuild_pipelines(&mut self, config: &SurfaceConfiguration, device: &Device) {
@@ -219,6 +207,12 @@ impl<'a> Renderer<'a> {
             &self.shared.common_uniforms.bind_group_layout,
             &self.shared.scene_storage.bind_group_layout,
         );
+
+        self.text_renderer.rebuild_pipeline(config, device, &self.shared.common_uniforms.bind_group_layout);
+    }
+
+    pub fn resize(&mut self, device: &Device, width: u32, height: u32) {
+        self.text_renderer.resize(device, width, height);
     }
 
     pub fn update_camera(&mut self, camera: &Camera, queue: &Queue) {
@@ -357,6 +351,14 @@ impl<'a> Renderer<'a> {
             &self.shared.scene_storage,
             &self.shared.common_uniforms.bind_group,
             &self.shared.scene_storage.bind_group,
+        );
+
+        self.text_renderer.render(
+            &context.device,
+            &context.queue,
+            &mut render_pass,
+            &self.shared.common_uniforms.bind_group,
+            camera_controller,
         );
 
         self.last_rendered = t;
@@ -630,8 +632,6 @@ impl<'a> Renderer<'a> {
                         if let Some(chunk) = scene_wires.get(&chunk_id) {
                             chunk.par_iter().for_each(|wire_id| {
                                 let wire = scene.wires().get(wire_id).unwrap();
-
-
 
                                 if actual_chunk_range.overlaps(&wire.aabb()) {
                                     return;

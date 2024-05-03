@@ -96,7 +96,11 @@ fn event_handler<'a>(
             ref e if SurfaceWrapper::start_condition(e) => {
                 app.surface.resume(&app.context, window.clone(), true);
 
-                let scene_renderer = Renderer::new(&app.surface.config(), &app.context.device);
+                let scene_renderer = Renderer::new(
+                    &app.surface.config(),
+                    &app.context.device,
+                    &app.context.queue,
+                );
 
                 let gui_renderer = GuiRenderer::new(
                     &app.context.device,

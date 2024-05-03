@@ -16,7 +16,7 @@ struct MouseUniform {
 struct WindowUniform {
     size: vec2<u32>,
     aspect: f32,
-}
+};
 
 @group($bg) @binding(0)
 var<uniform> camera: CameraUniform;

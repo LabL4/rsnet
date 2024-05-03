@@ -87,6 +87,13 @@ impl<'a> App<'a> {
             self.create_msaa_view();
             self.create_smaa_target();
         }
+        if self.scene_renderer.is_some() {
+            self.scene_renderer.as_mut().unwrap().resize(
+                &self.context.device,
+                size.width,
+                size.height,
+            );
+        }
         self.camera_controller.resize(size);
     }
 
@@ -165,7 +172,6 @@ impl<'a> App<'a> {
         }
 
         frame.present();
-
     }
 
     fn update_state(&mut self) {
@@ -205,14 +211,13 @@ impl<'a> App<'a> {
                 .as_ref()
                 .unwrap()
                 .cache
-                .chunk_range.clone().unwrap()
+                .chunk_range
+                .clone()
+                .unwrap(),
         );
-        self.state.set_chunk_step_idx(
-            self.camera_controller.chunk_step_idx
-        );
-        self.state.set_chunk_size(
-            self.camera_controller.chunk_size
-        );
+        self.state
+            .set_chunk_step_idx(self.camera_controller.chunk_step_idx);
+        self.state.set_chunk_size(self.camera_controller.chunk_size);
     }
 
     pub fn present(&mut self) {

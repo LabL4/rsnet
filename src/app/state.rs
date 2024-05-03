@@ -1,4 +1,8 @@
-use crate::{gui, scene::{self, utils::ChunkRange}, utils::FrameCounter};
+use crate::{
+    gui,
+    scene::{self, utils::ChunkRange},
+    utils::FrameCounter,
+};
 
 use smaa::SmaaMode;
 
@@ -23,9 +27,9 @@ impl Default for State {
         Self {
             scene: scene::Scene::default(),
             current_frame_time: f32::MAX,
-            msaa_count: 16,
+            msaa_count: 8,
             rebuild_bundles: true,
-            smaa: SmaaMode::Disabled,
+            smaa: SmaaMode::Smaa1X,
             rebuild_smaa: true,
             n_primitives_in_fragment_storage: 0,
             n_wires_in_buffer: 0,

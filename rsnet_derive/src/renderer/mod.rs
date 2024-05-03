@@ -1,17 +1,35 @@
 use proc_macro::TokenStream;
 use syn::Expr;
 
+macro_rules! assets_path {
+    () => {
+        concat!(env!("CARGO_MANIFEST_DIR"), "/../assets/")
+    };
+}
+
+macro_rules! asset_full_path {
+    ($rel_path:expr) => {
+        format!("{}{}", assets_path!(), $rel_path)
+    };
+}
+
+macro_rules! match_str_literal {
+    ($input:expr) => {
+        match $input {
+            Expr::Lit(lit) => match lit.lit {
+                syn::Lit::Str(s) => s.value(),
+                _ => panic!("Expected a string literal"),
+            },
+            _ => panic!("Expected a string literal"),
+        }
+    };
+}
+
 pub fn include_shader(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as Expr);
-    let shader_path = match input {
-        Expr::Lit(lit) => match lit.lit {
-            syn::Lit::Str(s) => s.value(),
-            _ => panic!("Expected a string literal"),
-        },
-        _ => panic!("Expected a string literal"),
-    };
+    let shader_path = match_str_literal!(input);
 
-    let shader_base_path = concat!(env!("CARGO_MANIFEST_DIR"), "/../assets/shaders/");
+    let shader_base_path = concat!(assets_path!(), "shaders/");
     let include_base_path = format!("{}{}", shader_base_path, "/include/");
 
     let shader_path = format!("{}{}", shader_base_path, shader_path);
@@ -54,6 +72,34 @@ pub fn include_shader(input: TokenStream) -> TokenStream {
 
     let output = quote::quote! {
         #shader_src
+    };
+    output.into()
+}
+
+pub fn include_asset(input: TokenStream) -> TokenStream {
+    let input: Expr = syn::parse_macro_input!(input as Expr);
+    let asset_relative_path = match_str_literal!(input);
+
+    let asset_path = asset_full_path!(asset_relative_path);
+
+    let asset_str = match std::fs::read_to_string(asset_path) {
+        Ok(ret_str) => ret_str,
+        Err(err) => panic!("Error including asset: {}", err),
+    };
+    let output = quote::quote! {
+        #asset_str
+    };
+    output.into()
+}
+
+pub fn include_asset_bytes(input: TokenStream) -> TokenStream {
+    let input: Expr = syn::parse_macro_input!(input as Expr);
+    let asset_relative_path = match_str_literal!(input);
+
+    let asset_path = asset_full_path!(asset_relative_path);
+
+    let output = quote::quote! {
+        include_bytes!(#asset_path)
     };
     output.into()
 }

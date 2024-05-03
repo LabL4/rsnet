@@ -4,7 +4,7 @@ use super::shared::*;
 
 use encase::{internal::WriteInto, ShaderType, StorageBuffer, UniformBuffer};
 use std::{fmt::Debug, num::NonZeroU32};
-use tracing::info;
+use tracing::{debug, info};
 use wgpu::{
     core::binding_model::BindGroupDescriptor, util::DeviceExt, BindGroup, BindGroupLayout,
     BindGroupLayoutDescriptor, Buffer, Device,
@@ -136,7 +136,7 @@ impl<T: ShaderType + WriteInto> StorageBufferData<T> {
 
         if capacity < size || self.changed {
             resized = true;
-            info!(
+            debug!(
                 "Creating new buffer, capacity: {}, size: {}",
                 capacity, size
             );

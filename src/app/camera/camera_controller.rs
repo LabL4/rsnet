@@ -5,7 +5,7 @@ use nalgebra::{
     ComplexField, Matrix4, Perspective3, Point3, RealField, UnitQuaternion, Vector2, Vector3,
 };
 use std::f32::consts::FRAC_PI_2;
-use tracing::info;
+use tracing::{debug, info};
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
     event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent},
@@ -123,7 +123,7 @@ pub struct CameraController {
     translate_sensitivity: f32,
     modifiers: ModifiersState,
 
-    window_size: PhysicalSize<u32>,
+    pub window_size: PhysicalSize<u32>,
     pub is_dirty: bool,
 
     pub screen_world_aabb: AaBb,
@@ -148,7 +148,7 @@ impl CameraController {
             aspect: (window_size.width as f32 / window_size.height as f32),
             fovy: 3.14 / 4.0,
             znear: 0.001,
-            zfar: 1000.0,
+            zfar: 100000.0,
         };
         let proj = Perspective3::new(
             perspective_params.aspect,
@@ -436,7 +436,7 @@ impl CameraController {
                 self.update_camera();
             }
             WindowEvent::Resized(size) => {
-                info!("Resized: {:#?}", size);
+                debug!("Resized: {:#?}", size);
                 self.resize(size);
             }
             // WindowEvent::Resized { 0: size } => {

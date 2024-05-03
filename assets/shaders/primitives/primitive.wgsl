@@ -19,6 +19,7 @@ struct VertexOutput {
     @location(2) tex_coords: vec2<f32>,
     @location(3) component_idx: u32,
     @location(4) fragment_ty: u32,
+    @location(5) barys: vec3<f32>,
 }
 
 fn mat3_to_mat4(m: mat3x3<f32>) -> mat4x4<f32> {
@@ -274,6 +275,15 @@ fn vs_main(
         }
     }
 
+    let triangle_vertex_idx = vertex_idx % 3;
+    if (triangle_vertex_idx == 0u) {
+        output.barys = vec3<f32>(1.0, 0.0, 0.0);
+    } else if (triangle_vertex_idx == 1u) {
+        output.barys = vec3<f32>(0.0, 1.0, 0.0);
+    } else {
+        output.barys = vec3<f32>(0.0, 0.0, 1.0);
+    }
+
     output.clip_pos = camera.view_proj * mat3_to_mat4(component.model) * output.clip_pos;
     output.component_idx = component_idx;
 
@@ -301,6 +311,14 @@ fn fs_line(in: VertexOutput) -> FragmentOutput {
     var output: FragmentOutput;
 
     output.color = in.color;
+
+    // let delta = fwidth(abs(in.barys));
+    // let smoothing = delta * 0.1;
+	// let thickness = delta * 4.0;
+    // let barys = smoothstep(thickness, thickness + smoothing, abs(in.barys));
+    // let min_coord = min(abs(barys.x), abs(barys.y));
+
+    // output.color.w = clamp(1.0 - min_coord, 0.0, 1.0);
 
     return output;
 }

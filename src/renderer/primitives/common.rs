@@ -172,6 +172,18 @@ lazy_static!(
                 //     line_cap_ty: 1
                 // },
                 LinePrimitive {
+                    positions: central_line[0..2].to_vec(),
+                    thickness: LINE_THICKNESS*0.05,
+                    color: 0x000000,
+                    line_cap_ty: 1
+                },
+                LinePrimitive {
+                    positions: central_line[1..3].to_vec(),
+                    thickness: LINE_THICKNESS*0.05,
+                    color: 0x000000,
+                    line_cap_ty: 1
+                },
+                LinePrimitive {
                     positions: central_line,
                     thickness: LINE_THICKNESS*1.4,
                     color: 0x000000,
