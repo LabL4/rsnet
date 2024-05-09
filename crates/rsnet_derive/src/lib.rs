@@ -6,7 +6,7 @@ extern crate quote;
 mod renderer;
 
 use proc_macro::TokenStream;
-use syn::{parse::Parse, Expr, Token};
+use syn::{parse::Parse, Expr};
 
 // use rs
 
@@ -47,19 +47,33 @@ pub fn derive(input: TokenStream) -> TokenStream {
     output.into()
 }
 
-struct GetOrReturnNoneMacroInput {
-    var_name: syn::Ident,
-    _comma: Token![,],
+struct SingleExprInput {
+    // var_name: syn::Ident,
+    // _comma: Token![,],
     get_expr: Expr,
     // comma: Token![,],
     // key_expr: Expr
 }
 
-impl Parse for GetOrReturnNoneMacroInput {
+impl Parse for SingleExprInput {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         Ok(Self {
-            var_name: input.parse()?,
-            _comma: input.parse()?,
+            // var_name: input.parse()?,
+            // _comma: input.parse()?,
+            get_expr: input.parse()?,
+            // comma: input.parse()?,
+            // key_expr: input.parse()?,
+        })
+    }
+}
+
+struct UnwrapResultOrReturnNoneMacroInput {
+    get_expr: Expr,
+}
+
+impl Parse for UnwrapResultOrReturnNoneMacroInput {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        Ok(Self {
             get_expr: input.parse()?,
             // comma: input.parse()?,
             // key_expr: input.parse()?,
@@ -69,18 +83,57 @@ impl Parse for GetOrReturnNoneMacroInput {
 
 // Proc macro to get from hashmap or return
 #[proc_macro]
-pub fn unwrap_or_return_none(input: TokenStream) -> TokenStream {
-    let input_expr = syn::parse_macro_input!(input as GetOrReturnNoneMacroInput);
+pub fn unwrap_option_or_return_none(input: TokenStream) -> TokenStream {
+    let input_expr = syn::parse_macro_input!(input as SingleExprInput);
 
-    let var_name = input_expr.var_name;
+    // let var_name = input_expr.var_name;
     let get_expr = input_expr.get_expr;
 
     let output = quote! {
-        let #var_name: Option<_> = #get_expr;
-        if #var_name.is_none() {
-            return None
+        {
+            let v = #get_expr;
+            if v.is_none() {
+                return None;
+            }
+            v.unwrap()
         }
-        let #var_name = #var_name.unwrap();
+    };
+    output.into()
+}
+
+#[proc_macro]
+pub fn unwrap_result_or_return_none(input: TokenStream) -> TokenStream {
+    let input_expr = syn::parse_macro_input!(input as UnwrapResultOrReturnNoneMacroInput);
+
+    let get_expr = input_expr.get_expr;
+
+    let output = quote! {
+        {
+            let v = #get_expr;
+            if v.is_err() {
+                return None;
+            }
+            v.unwrap()
+        }
+    };
+    output.into()
+}
+
+#[proc_macro]
+pub fn unwrap_result_or_return(input: TokenStream) -> TokenStream {
+    let input_expr = syn::parse_macro_input!(input as SingleExprInput);
+
+    // let var_name = input_expr.var_name;
+    let get_expr = input_expr.get_expr;
+
+    let output = quote! {
+        {
+            let v = #get_expr;
+            if v.is_err() {
+                return;
+            }
+            v.unwrap()
+        }
     };
     output.into()
 }

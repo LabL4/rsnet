@@ -1,7 +1,6 @@
-use nalgebra::Vector2;
+use super::types::*;
 
-pub type ChunkId = (i32, i32);
-pub type ChunkSize = u32;
+use nalgebra::Vector2;
 
 pub trait FromPosition {
     fn from_position(position: &Vector2<f32>, chunk_size: f32) -> Self;

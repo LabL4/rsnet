@@ -1,0 +1,16 @@
+[package]
+name = "rsnet_net_parser"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# anyhow = "1.0.83"
+thiserror = "1.0.60"
+pyo3 = "0.21.2"
+
+rsnet-derive = { path = "../rsnet_derive"}
+
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"

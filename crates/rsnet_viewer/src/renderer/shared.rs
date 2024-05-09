@@ -1,5 +1,8 @@
-use super::{uniform_as_wgsl_bytes, utils::UniformBufferData};
+use super::shared;
+use super::utils;
+
 use crate::app::camera::Camera;
+use utils::{uniform_as_wgsl_bytes, UniformBufferData};
 
 use encase::ShaderType;
 use nalgebra::{Matrix4, Vector2};

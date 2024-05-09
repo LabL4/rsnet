@@ -8,7 +8,7 @@ use super::shared::Vertex;
 
 pub enum TextPipelineType {
     Offscreen,
-    Onscreen
+    Onscreen,
 }
 
 pub fn create_offscreen_pipeline(
@@ -27,7 +27,7 @@ pub fn create_offscreen_pipeline(
         "vs_offscreen",
         "fs_offscreen",
         shader_str,
-        TextPipelineType::Offscreen
+        TextPipelineType::Offscreen,
     )
 }
 
@@ -48,7 +48,7 @@ pub fn create_onscreen_pipeline(
         "vs_onscreen",
         "fs_onscreen",
         shader_str,
-        TextPipelineType::Onscreen
+        TextPipelineType::Onscreen,
     )
 }
 
@@ -61,7 +61,7 @@ pub fn create_pipeline(
     vs_entry_point: &str,
     fs_entry_point: &str,
     shader_str: &str,
-    pipeline_ty: TextPipelineType
+    pipeline_ty: TextPipelineType,
 ) -> wgpu::RenderPipeline {
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some((label.to_string() + " shader").as_str()),
@@ -91,27 +91,21 @@ pub fn create_pipeline(
             entry_point: fs_entry_point,
             targets: &[Some(wgpu::ColorTargetState {
                 format: color_format,
-                blend: Some(
-                    match pipeline_ty {
-                        TextPipelineType::Offscreen => {
-                            wgpu::BlendState {
-                                color: wgpu::BlendComponent {
-                                    dst_factor: wgpu::BlendFactor::One,
-                                    src_factor: wgpu::BlendFactor::One,
-                                    operation: wgpu::BlendOperation::Add
-                                },
-                                alpha: wgpu::BlendComponent {
-                                    dst_factor: wgpu::BlendFactor::One,
-                                    src_factor: wgpu::BlendFactor::One,
-                                    operation: wgpu::BlendOperation::Add
-                                }
-                            }
-                        }
-                        TextPipelineType::Onscreen => {
-                            wgpu::BlendState::ALPHA_BLENDING
-                        }
-                    }
-            ),
+                blend: Some(match pipeline_ty {
+                    TextPipelineType::Offscreen => wgpu::BlendState {
+                        color: wgpu::BlendComponent {
+                            dst_factor: wgpu::BlendFactor::One,
+                            src_factor: wgpu::BlendFactor::One,
+                            operation: wgpu::BlendOperation::Add,
+                        },
+                        alpha: wgpu::BlendComponent {
+                            dst_factor: wgpu::BlendFactor::One,
+                            src_factor: wgpu::BlendFactor::One,
+                            operation: wgpu::BlendOperation::Add,
+                        },
+                    },
+                    TextPipelineType::Onscreen => wgpu::BlendState::ALPHA_BLENDING,
+                }),
                 write_mask: wgpu::ColorWrites::ALL,
             })],
         }),

@@ -13,7 +13,7 @@ use crate::{
             attach_buffer, component_primitives_vec_to_fragments,
             fragments_bind_group_layout_descriptor,
         },
-        uniform_as_wgsl_bytes, StorageBufferData, UniformBufferData,
+        utils::{uniform_as_wgsl_bytes, StorageBufferData, UniformBufferData},
     },
     utils::retain_by_range,
 };

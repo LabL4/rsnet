@@ -20,9 +20,7 @@ impl Texture {
             sample_count: msaa_count,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Bgra8UnormSrgb,
-            usage: 
-                wgpu::TextureUsages::RENDER_ATTACHMENT
-                | wgpu::TextureUsages::TEXTURE_BINDING,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
             view_formats: &[wgpu::TextureFormat::Bgra8UnormSrgb],
         }
     }
@@ -31,7 +29,8 @@ impl Texture {
         self.texture = device.create_texture(&Self::desc(width, height, self.msaa_count));
         self.view = self.texture.create_view(&Default::default());
         self.bind_group_layout = Self::create_bind_group_layout(device, self.msaa_count);
-        self.bind_group = Self::create_bind_group(device, &self.bind_group_layout, &self.view, &self.sampler);
+        self.bind_group =
+            Self::create_bind_group(device, &self.bind_group_layout, &self.view, &self.sampler);
     }
 
     pub fn set_msaa_count(&mut self, msaa_count: u32) {
@@ -72,7 +71,10 @@ impl Texture {
         })
     }
 
-    pub fn create_bind_group_layout(device: &wgpu::Device, msaa_count: u32) -> wgpu::BindGroupLayout {
+    pub fn create_bind_group_layout(
+        device: &wgpu::Device,
+        msaa_count: u32,
+    ) -> wgpu::BindGroupLayout {
         device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[
                 wgpu::BindGroupLayoutEntry {

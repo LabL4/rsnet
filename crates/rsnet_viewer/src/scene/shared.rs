@@ -1,8 +1,10 @@
-use super::{
-    component::Component,
-    wire::{Wire, WireSegment},
-    ChunkId,
-};
+use super::component;
+use super::types;
+use super::wire;
+
+use component::Component;
+use types::ChunkId;
+use wire::{Wire, WireSegment};
 
 use crate::renderer::utils::{storage_as_wgsl_bytes, StorageBufferData};
 

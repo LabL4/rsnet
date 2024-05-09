@@ -223,8 +223,6 @@ class StanfordModel:
         elif self.gap > self.params["gap_max"]:
             self.gap = self.params["gap_max"]
 
-
-
         return self.params["I0"] * np.exp(-self.gap / self.params["g0"]) * np.sinh(vtb / self.params["V0"])
 
     def _compute_gap_int(self, current_time: float) -> float:

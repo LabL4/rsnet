@@ -21,7 +21,6 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 lazy_static = "1.4.0"
 anyhow = "1.0.78"
 
-
 rayon = "1.9.0"
 
 uuid = { version = "1.6.1", features = ["v4", "fast-rng"] }

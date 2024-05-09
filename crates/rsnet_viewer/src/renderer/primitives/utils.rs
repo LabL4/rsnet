@@ -1,7 +1,7 @@
 use super::super::utils::{storage_as_wgsl_bytes, StorageBufferData};
 use super::{shared::*, ComponentTyPrimitives};
 
-use crate::renderer::{uniform_as_wgsl_bytes, UniformBufferData};
+use crate::renderer::utils::{uniform_as_wgsl_bytes, UniformBufferData};
 
 use encase::internal::WriteInto;
 use encase::ShaderType;

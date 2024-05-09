@@ -1,8 +1,12 @@
-use nalgebra::{ComplexField, Vector2};
+use super::types;
+use super::utils;
+
+use types::*;
+use utils::{chunk_id_from_position, ChunkRange, FromPosition};
 
 use crate::{renderer::effects::grid, utils::merge_sorted_vecs};
 
-use super::{chunk_id_from_position, ChunkId, ChunkRange, FromPosition};
+use nalgebra::{ComplexField, Vector2};
 
 #[derive(Debug)]
 pub struct WireSegment {

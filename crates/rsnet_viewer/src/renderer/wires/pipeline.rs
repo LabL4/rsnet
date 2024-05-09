@@ -1,4 +1,4 @@
-use crate::renderer::{chunk_data_layout, common_uniforms_layout, time_data_layout};
+use crate::renderer::utils::{chunk_data_layout, common_uniforms_layout, time_data_layout};
 
 use rsnet_derive::include_shader;
 use wgpu::{Device, SurfaceConfiguration};
