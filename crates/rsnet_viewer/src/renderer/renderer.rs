@@ -15,7 +15,10 @@ use text_renderer::TextRenderer;
 use utils::*;
 
 use crate::{
-    app::camera::{Camera, CameraController},
+    app::{
+        self,
+        camera::{Camera, CameraController}
+    },
     scene::{
         self,
         shared::{
@@ -26,7 +29,8 @@ use crate::{
         Scene,
     },
     timed,
-    utils::{insert_ordered_at, wgpu::context::Context, Id, WindowSize},
+    types::{Id, WindowSize},
+    utils::{insert_ordered_at, wgpu::context::Context},
 };
 
 use rayon::prelude::*;
@@ -280,6 +284,7 @@ impl<'a> Renderer<'a> {
         view: &TextureView,
         context: &Context,
         encoder: &mut CommandEncoder,
+        state: &app::State,
         camera_controller: &mut CameraController,
         scene: &Scene,
     ) {
@@ -329,13 +334,15 @@ impl<'a> Renderer<'a> {
 
         // self.render_effects(&mut render_pass);
 
-        effects::render::render(
-            &mut render_pass,
-            &self.pipelines.grid_effect,
-            &self.shared.common_uniforms.bind_group,
-            &self.shared.time_uniform.bind_group,
-            &self.shared.chunk_data_uniform.bind_group,
-        );
+        if state.grid() {
+            effects::render::render(
+                &mut render_pass,
+                &self.pipelines.grid_effect,
+                &self.shared.common_uniforms.bind_group,
+                &self.shared.time_uniform.bind_group,
+                &self.shared.chunk_data_uniform.bind_group,
+            );
+        }
 
         primitives::render::render(
             &mut render_pass,
@@ -357,13 +364,13 @@ impl<'a> Renderer<'a> {
             &self.shared.scene_storage.bind_group,
         );
 
-        self.text_renderer.render(
-            &context.device,
-            &context.queue,
-            &mut render_pass,
-            &self.shared.common_uniforms.bind_group,
-            camera_controller,
-        );
+        // self.text_renderer.render(
+        //     &context.device,
+        //     &context.queue,
+        //     &mut render_pass,
+        //     &self.shared.common_uniforms.bind_group,
+        //     camera_controller,
+        // );
 
         self.last_rendered = t;
     }
@@ -456,7 +463,7 @@ impl<'a> Renderer<'a> {
         // Add primitives to the fragments storage
         for (compty, _) in self.cache.n_components_by_type.iter() {
             if self.cache.compty_fragments_index_map.get(compty).is_none() {
-                match scene.primitives().get(compty) {
+                match scene.primitives().0.get(compty) {
                     Some(primitives) => {
                         write = true;
                         for (primitive, max_dist) in primitives {
@@ -479,6 +486,8 @@ impl<'a> Renderer<'a> {
                 };
             }
         }
+
+        // println!("compty_fragments_index_map")
 
         // Remove primitives from the fragments storage
         let mut to_remove_idx = Vec::new();
@@ -517,6 +526,7 @@ impl<'a> Renderer<'a> {
         fragments_storage.remove_primitives(to_remove_idx);
 
         if write {
+            // println!("{:#?}", self.cache.compty_fragments_index_map);
             fragments_storage.write(device, queue);
         }
     }

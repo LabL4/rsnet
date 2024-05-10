@@ -9,6 +9,7 @@ use smaa::SmaaMode;
 pub struct State {
     pub scene: scene::Scene,
 
+    grid: bool, // If the grid is visible
     current_frame_time: f32,
     msaa_count: u32,
     rebuild_bundles: bool, // Controls whether to rebuild the render pipelines and texture views
@@ -26,6 +27,7 @@ impl Default for State {
     fn default() -> Self {
         Self {
             scene: scene::Scene::default(),
+            grid: false,
             current_frame_time: f32::MAX,
             msaa_count: 8,
             rebuild_bundles: true,
@@ -42,6 +44,15 @@ impl Default for State {
 }
 
 impl State {
+
+    pub fn grid(&self) -> bool {
+        self.grid
+    }
+
+    pub fn set_grid(&mut self, grid: bool) {
+        self.grid = grid;
+    }
+
     pub fn current_frame_time(&self) -> f32 {
         self.current_frame_time
     }

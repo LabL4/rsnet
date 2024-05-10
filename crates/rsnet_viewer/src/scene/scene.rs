@@ -1,9 +1,11 @@
 use super::component;
+use super::component::DefaultComponentTypes;
+use super::scene_manager;
 use super::types;
 use super::utils;
 use super::wire;
 
-use component::{Component, ComponentType};
+use component::Component;
 use nalgebra::Vector2;
 use tracing::info;
 use types::*;
@@ -19,11 +21,18 @@ use crate::{
         },
         ComponentTyPrimitives,
     },
-    utils::Id,
+    types::Id,
 };
 use rsnet_derive::unwrap_option_or_return_none;
 
 use std::{collections::HashMap, hash::Hash};
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum SceneError {
+    #[error("Cannot add component with id {0}, it already exists, try calling the update_component method instead")]
+    ComponentAlreadyExists(Id),
+}
 
 #[derive(Debug)]
 pub struct Scene {
@@ -35,7 +44,9 @@ pub struct Scene {
     wires_chunk_cache: ChunkedStorage<Id>,
     wires: HashMap<Id, Wire>,
 
-    primitives: HashMap<ComponentType, Vec<(&'static ComponentTyPrimitives, f32)>>,
+    // primitives: HashMap<ComponentType, Vec<(&'static ComponentTyPrimitives, f32)>>,
+    primitives: Primitives,
+    last_id: Id,
 }
 
 impl Default for Scene {
@@ -46,86 +57,82 @@ impl Default for Scene {
 
 impl Scene {
     pub fn new() -> Self {
-        let mut scene = Scene {
-            components: HashMap::new(),
-            id_to_chunksize_chunk: HashMap::new(),
-            wires_chunk_cache: HashMap::new(),
-            wires: HashMap::new(),
-            primitives: HashMap::new(),
-        };
+        // let mut scene = Scene::new_empty();
+        let nn = rsnet_net_parser::extract_nn(include_str!("../../../rsnet_net_parser/src/test.py"));
+        let mut scene = scene_manager::gen_from_nn(nn.unwrap());
 
         let chunk_size = 10;
         let chunk_step_idx = 0;
 
         // Add 10M components to the scene
         let n_cols = 2;
-        let n_rows = 1;
+        let n_rows = 1;        
 
-        let n_cols = 1000;
-        let n_rows = 1000;
+        // let n_cols = 1000;
+        // let n_rows = 1000;
 
-        for i in 0..n_rows {
-            for j in 0..n_cols {
-                let spacing = 2.0;
-                let pos = Vector2::new(j as f32, i as f32) * spacing;
-                let id = j + 1 + i * n_cols;
-                // info!("Adding component with id {}", j + i*n_cols);
-                // scene.add_component(chunk_step_idx, Component::new(id, 0, pos, 0.0  , id%3));
-                // scene.add_component(chunk_step_idx, Component::new(id, 0, pos, 0.0, id % 3));
-                scene.add_component(
-                    chunk_step_idx,
-                    Component::new(id, 0, pos, 0.0, (id - 1) % 4),
-                    //Component::new(id, 0, pos, 0.0, 3),
-                );
-            }
-        }
+        // for i in 0..n_rows {
+        //     for j in 0..n_cols {
+        //         let spacing = 2.0;
+        //         let pos = Vector2::new(j as f32, i as f32) * spacing;
+        //         let id = j + 1 + i * n_cols;
+        //         // info!("Adding component with id {}", j + i*n_cols);
+        //         // scene.add_component(chunk_step_idx, Component::new(id, 0, pos, 0.0  , id%3));
+        //         // scene.add_component(chunk_step_idx, Component::new(id, 0, pos, 0.0, id % 3));
+        //         scene.add_component(
+        //             chunk_step_idx,
+        //             Component::new(id, 0, pos, 0.0, (id - 1) % 4),
+        //             //Component::new(id, 0, pos, 0.0, 3),
+        //         );
+        //     }
+        // }
 
         // println!("components: {:#?}", scene.components);
 
-        let chunk_size = chunk_size_from_step_idx(chunk_step_idx);
+        // let chunk_size = chunk_size_from_step_idx(chunk_step_idx);
 
-        scene.add_wire(
-            chunk_step_idx,
-            Wire::new(
-                0,
-                Vector2::new(0.0, 0.0),
-                Vector2::new(10.0, 10.0),
-                Vector2::new(1.0, 0.0),
-                Vector2::new(1.0, 1.0),
-                chunk_size,
-            ),
-        );
+        // scene.add_wire(
+        //     chunk_step_idx,
+        //     Wire::new(
+        //         0,
+        //         Vector2::new(0.0, 0.0),
+        //         Vector2::new(10.0, 10.0),
+        //         Vector2::new(1.0, 0.0),
+        //         Vector2::new(1.0, 1.0),
+        //         chunk_size,
+        //     ),
+        // );
 
-        scene.add_wire(
-            chunk_step_idx,
-            Wire::new(
-                1,
-                Vector2::new(10.0, 10.0),
-                Vector2::new(20.0, 10.0),
-                Vector2::new(1.0, 0.0),
-                Vector2::new(1.0, 1.0),
-                chunk_size,
-            ),
-        );
+        // scene.add_wire(
+        //     chunk_step_idx,
+        //     Wire::new(
+        //         1,
+        //         Vector2::new(10.0, 10.0),
+        //         Vector2::new(20.0, 10.0),
+        //         Vector2::new(1.0, 0.0),
+        //         Vector2::new(1.0, 1.0),
+        //         chunk_size,
+        //     ),
+        // );
 
-        scene.primitives.insert(
-            0,
-            vec![
-                (&MEMRISTOR_PRIMITIVES_L0, 400.0),
-                (&MEMRISTOR_PRIMITIVES_L1, 1200.0),
-            ],
-        );
+        // scene.primitives.insert(
+        //     0,
+        //     vec![
+        //         (&MEMRISTOR_PRIMITIVES_L0, 400.0),
+        //         (&MEMRISTOR_PRIMITIVES_L1, 1200.0),
+        //     ],
+        // );
 
-        scene
-            .primitives
-            .insert(1, vec![(&OMP_AMP_PRIMITIVES_L0, 400.0)]);
-        scene
-            .primitives
-            .insert(2, vec![(&NMOS_PRIMITIVES_L0, 400.0)]);
+        // scene
+        //     .primitives
+        //     .insert(1, vec![(&OMP_AMP_PRIMITIVES_L0, 400.0)]);
+        // scene
+        //     .primitives
+        //     .insert(2, vec![(&NMOS_PRIMITIVES_L0, 400.0)]);
 
-        scene
-            .primitives
-            .insert(3, vec![(&RESISTOR_PRIMITIVES_L0, 400.0)]);
+        // scene
+        //     .primitives
+        //     .insert(3, vec![(&RESISTOR_PRIMITIVES_L0, 400.0)]);
 
         // scene.add_component(Component::new(0, 0, Vector2::new(1.0,0.0), 0.0, 0));
         // scene.add_component(Component::new(0, 0, Vector2::new(10.0,0.0), 0.0, 0));
@@ -133,13 +140,30 @@ impl Scene {
         scene
     }
 
+    pub fn new_empty() -> Self {
+
+        println!("{:#?}", DefaultComponentTypes::primitives());
+        Scene {
+            components: HashMap::new(),
+            id_to_chunksize_chunk: HashMap::new(),
+            wires_chunk_cache: HashMap::new(),
+            wires: HashMap::new(),
+            primitives: DefaultComponentTypes::primitives(),
+            last_id: 0,
+        }
+    }
+
     pub fn primitives(
         &self,
-    ) -> &HashMap<ComponentType, Vec<(&'static ComponentTyPrimitives, f32)>> {
+    ) -> &Primitives {
         &self.primitives
     }
 
-    pub fn add_component(&mut self, chunk_step_idx: u32, component: Component) {
+    pub fn add_component(
+        &mut self,
+        chunk_step_idx: u32,
+        component: Component,
+    ) -> Result<(), SceneError> {
         let chunk_id = chunk_id_from_position(
             &component.position(),
             chunk_size_from_step_idx(chunk_step_idx + 1),
@@ -155,11 +179,16 @@ impl Scene {
             .or_insert(HashMap::new());
 
         let components = chunked_comps.entry(chunk_id).or_insert(Vec::new());
+
         match components.binary_search_by_key(&component.id(), |c| c.id()) {
             Ok(pos) => {
-                components[pos] = component;
+                //components[pos] = component;
+                Err(SceneError::ComponentAlreadyExists(component.id()))
             }
-            Err(pos) => components.insert(pos, component),
+            Err(pos) => {
+                components.insert(pos, component);
+                Ok(())
+            }
         }
     }
 

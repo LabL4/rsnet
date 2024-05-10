@@ -4,6 +4,7 @@ use crate::renderer::primitives::*;
 
 use lazy_static::lazy_static;
 use nalgebra::Vector2;
+use rayon::vec;
 
 const MEMRISTOR_HEIGHT: f32 = 0.6 * 1.3;
 const MEMRISTOR_WIDTH: f32 = 0.2 * 1.3;
@@ -11,7 +12,7 @@ const MEMRISTOR_LOWER_RECT_HEIGHT: f32 = 0.05;
 const MEMRISTOR_UPPER_HEIGHT: f32 = MEMRISTOR_HEIGHT - MEMRISTOR_LOWER_RECT_HEIGHT;
 const MEMRISTOR_N_VERTICAL_DIVS: f32 = 5.0;
 const MEMRISTOR_LINE_THICKNESS: f32 = 0.02;
-const MEMRISTOR_TERMINAL_LEN: f32 = 0.1;
+const MEMRISTOR_TERMINAL_LEN: f32 = 0.2;
 
 const LINE_THICKNESS: f32 = 0.02;
 
@@ -425,6 +426,70 @@ lazy_static!(
                     ty: PortType::InOut
                 }
             ]
+        }
+    };
+
+    pub static ref DIODE_PRIMITIVES_L0: ComponentTyPrimitives = {
+
+        const DIODE_WIDTH: f32 = 0.65 * 0.5;
+        const DIODE_HEIGHT: f32 = 0.8 * 0.5;
+        const TERMINAL_LEN: f32 = 0.2;
+
+        let mut outline: Vec<Vector2<f32>> = vec![];
+        outline.push(Vector2::new(-DIODE_WIDTH / 2.0, 0.0));
+        outline.push(Vector2::new(-DIODE_WIDTH / 2.0, DIODE_HEIGHT / 2.0));
+        outline.push(Vector2::new(DIODE_WIDTH / 2.0, 0.0));
+        outline.push(Vector2::new(-DIODE_WIDTH / 2.0, -DIODE_HEIGHT / 2.0));
+        outline.push(Vector2::new(-DIODE_WIDTH / 2.0, 0.0));
+
+
+
+        let anode_terminal = vec![
+            Vector2::new(-DIODE_WIDTH / 2.0, 0.0),
+            Vector2::new(-DIODE_WIDTH / 2.0 - TERMINAL_LEN, 0.0)
+        ];
+
+        let cathode_terminal = vec![
+            Vector2::new(DIODE_WIDTH / 2.0, 0.0),
+            Vector2::new(DIODE_WIDTH / 2.0 + TERMINAL_LEN, 0.0)
+        ];
+
+        let cathode_bar = vec![
+            Vector2::new(cathode_terminal.first().unwrap().x, -DIODE_HEIGHT / 2.0 * 1.13),
+            Vector2::new(cathode_terminal.first().unwrap().x,  DIODE_HEIGHT / 2.0 * 1.13)
+        ];
+
+        ComponentTyPrimitives {
+            circles: vec![],
+            lines: vec![
+                LinePrimitive {
+                    positions: outline,
+                    thickness: LINE_THICKNESS * 1.5,
+                    color: 0x000000,
+                    line_cap_ty: 0
+                },
+                LinePrimitive {
+                    positions: cathode_bar,
+                    thickness: LINE_THICKNESS * 1.5,
+                    color: 0x000000,
+                    line_cap_ty: 0
+                },
+                LinePrimitive {
+                    positions: cathode_terminal.clone(),
+                    thickness: LINE_THICKNESS,
+                    color: 0x000000,
+                    line_cap_ty: 0
+                },
+                LinePrimitive {
+                    positions: anode_terminal.clone(),
+                    thickness: LINE_THICKNESS,
+                    color: 0x000000,
+                    line_cap_ty: 0
+                }
+            ],
+            rectangles: vec![],
+            triangles: vec![],
+            ports: vec![]
         }
     };
 );

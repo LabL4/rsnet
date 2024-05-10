@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 use thiserror::Error;
 
-mod types;
+pub mod types;
 
 use types::*;
 
@@ -72,14 +72,14 @@ pub fn parse_nn<'py>(nn_instance: Bound<'py, PyAny>) -> Result<Nn, NnParseError>
                 // info!("output_size: {:?}", output_size);
                 // info!("bias: {:?}", bias);
 
-                nn.layers.push(Box::new(LinearLayer {
+                nn.layers.push(Layer::Linear(LinearLayer {
                     input_size,
                     output_size,
                     bias: bias.is_some(),
                 }))
             }
             "ReLU" => {
-                nn.layers.push(Box::new(Activation::ReLU));
+                nn.layers.push(Layer::Activation(Activation::ReLU));
             }
             _ => {}
         }
@@ -89,6 +89,9 @@ pub fn parse_nn<'py>(nn_instance: Bound<'py, PyAny>) -> Result<Nn, NnParseError>
 }
 
 pub fn extract_nn(src: &str) -> Result<Nn, NnParseError> {
+
+    pyo3::prepare_freethreaded_python();
+
     Python::with_gil(|py| {
         let nn_class = get_nn_class(py, src)?;
 

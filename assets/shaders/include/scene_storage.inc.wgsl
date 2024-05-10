@@ -8,7 +8,8 @@ struct Wire {
     start: vec2<f32>,
     end: vec2<f32>,
     prev_dir: vec2<f32>,
-    next_dir: vec2<f32>
+    next_dir: vec2<f32>,
+    // circular_overlay: u32
 }
 
 @group($bg) @binding(0)

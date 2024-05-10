@@ -144,6 +144,7 @@ impl<'a> App<'a> {
                 smaa_frame.as_deref().unwrap_or(&view),
                 &self.context,
                 &mut encoder,
+                &self.state,
                 &mut self.camera_controller,
                 &self.state.scene,
             );

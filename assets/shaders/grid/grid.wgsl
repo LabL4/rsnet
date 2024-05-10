@@ -120,7 +120,7 @@ fn fs_main(input: VertexOutput) -> FragmentOutput {
     let grid_size_fourth = grid_size / 4.0;
 
     let delta = fwidth(min(world_coord.x, world_coord.y));
-    let line_width = delta / grid_size * 5.0;
+    let line_width = delta / grid_size * 4.0;
     let line_width_fourth = line_width * 2.0;
 
     let scaled_x = (world_coord.x - grid_size / 2.0) / grid_size;
@@ -153,7 +153,7 @@ fn fs_main(input: VertexOutput) -> FragmentOutput {
 
 
     // output.color = vec4(1.0, 1.0, 0.0, 1.0) * abs(input.tex_coord.x);
-    // output.color.w = 1.0;
+    // output.color.w *= 0.7;
 
 
     return output;

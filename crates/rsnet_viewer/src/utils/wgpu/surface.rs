@@ -1,5 +1,6 @@
 use super::context::Context;
-use crate::utils::WindowSize;
+
+use crate::types::WindowSize;
 
 use std::sync::Arc;
 use tracing::info;

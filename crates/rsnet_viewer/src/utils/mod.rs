@@ -7,9 +7,6 @@ use nalgebra::Vector2;
 use rayon::prelude::*;
 use std::{collections::HashMap, fmt::Debug};
 
-pub type WindowSize = winit::dpi::PhysicalSize<u32>;
-pub type Id = u32;
-
 #[derive(Debug, Clone)]
 pub struct AaBb {
     pub min: Vector2<f32>,

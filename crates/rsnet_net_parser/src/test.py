@@ -6,10 +6,13 @@ class SimpleMLP(nn.Module):
         super().__init__()
         self.layers = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(28*28, 20, bias=False),
+            nn.Linear(5, 20, bias=False),
             nn.ReLU(),
             nn.Linear(20, 10, bias=False),
-            # nn.ReLU(),
+            nn.ReLU(),
+            nn.Linear(10, 3, bias=False),
+            nn.ReLU(),
+            nn.Linear(3, 1000, bias=False),
         )
 
     def forward(self, x):
@@ -22,6 +25,3 @@ class SimpleMLP(nn.Module):
             npar += p.numel()
         
         return npar
-
-# print(SimpleMLP().layers[1].bias)
-# print(type(SimpleMLP().layers[1].bias))

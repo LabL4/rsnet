@@ -54,6 +54,7 @@ pub struct WireBufferEntry {
     pub end: Vector2<f32>,
     pub prev_direction: Vector2<f32>,
     pub next_direction: Vector2<f32>,
+    // pub circle_overlay: u32
 }
 
 impl WireBufferEntry {
@@ -64,6 +65,7 @@ impl WireBufferEntry {
             end: wire.end().clone(),
             prev_direction: wire.prev_direction().clone(),
             next_direction: wire.next_direction().clone(),
+            // circle_overlay: wire.circle_overlay(),
         }
     }
 

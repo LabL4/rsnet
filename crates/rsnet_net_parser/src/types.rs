@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Activation {
     ReLU,
     // Sigmoid,
@@ -8,20 +8,20 @@ pub enum Activation {
     // Softmax,
 }
 
-impl Layer for Activation {}
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LinearLayer {
     pub input_size: usize,
     pub output_size: usize,
     pub bias: bool,
 }
 
-impl Layer for LinearLayer {}
+#[derive(Debug, Clone)]
+pub enum Layer {
+    Linear(LinearLayer),
+    Activation(Activation),
+}
 
-pub trait Layer: Debug {}
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Nn {
-    pub layers: Vec<Box<dyn Layer>>,
+    pub layers: Vec<Layer>,
 }

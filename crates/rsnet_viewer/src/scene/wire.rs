@@ -45,6 +45,9 @@ pub struct Wire {
     prev_direction: Vector2<f32>,
     next_direction: Vector2<f32>,
 
+    /// used to signal that a circle should be drawn at the end or start of the wire (11: both, 10: start, 01: end, 00: none)
+    circle_overlay: u32,
+
     /// The AABB of the wire
     aabb: ChunkRange, // node_id: u32
 }
@@ -74,6 +77,7 @@ impl Wire {
             next_direction,
 
             aabb: range,
+            circle_overlay: 0
         }
     }
 
@@ -142,7 +146,7 @@ impl Wire {
                     wire_id: self.id,
                     start,
                     end,
-                    ty: 0,
+                    ty: 0,                      
                 },
             ));
         }
@@ -172,6 +176,10 @@ impl Wire {
 
     pub fn prev_direction(&self) -> &Vector2<f32> {
         &self.prev_direction
+    }
+
+    pub fn circle_overlay(&self) -> u32 {
+        self.circle_overlay
     }
 }
 
