@@ -12,7 +12,7 @@ class SimpleMLP(nn.Module):
             nn.ReLU(),
             nn.Linear(10, 3, bias=False),
             nn.ReLU(),
-            nn.Linear(3, 1000, bias=False),
+            nn.Linear(30, 1000, bias=False),
         )
 
     def forward(self, x):

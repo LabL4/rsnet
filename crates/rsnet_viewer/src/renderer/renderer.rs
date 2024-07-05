@@ -17,7 +17,7 @@ use utils::*;
 use crate::{
     app::{
         self,
-        camera::{Camera, CameraController}
+        camera::{Camera, CameraController},
     },
     scene::{
         self,

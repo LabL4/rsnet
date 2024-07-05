@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use crate::renderer::primitives::ComponentTyPrimitives;
 
-
 pub type ComponentType = u32;
 
 pub type ChunkId = (i32, i32);

@@ -3,10 +3,8 @@ pub mod aa_selector;
 use aa_selector::AaSelector;
 
 use crate::gui::{
-    state::{
-        widget, WidgetId, WidgetSystem
-    },
-    widgets::toggle_switch
+    state::{widget, WidgetId, WidgetSystem},
+    widgets::toggle_switch,
 };
 use rsnet_derive::Widget;
 
@@ -42,13 +40,12 @@ impl WidgetSystem for Settings {
                 ui.end_row();
 
                 let mut grid = app_state.grid();
-                
+
                 ui.add(egui::Label::new("Grid"));
 
-                ui.add(toggle_switch::toggle(&mut grid)).on_hover_text(
-                    "Toggle grid visibility.",
-                );
-                
+                ui.add(toggle_switch::toggle(&mut grid))
+                    .on_hover_text("Toggle grid visibility.");
+
                 if grid != app_state.grid() {
                     app_state.set_grid(grid);
                 }

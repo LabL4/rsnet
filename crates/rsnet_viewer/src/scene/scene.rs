@@ -46,7 +46,6 @@ pub struct Scene {
 
     // primitives: HashMap<ComponentType, Vec<(&'static ComponentTyPrimitives, f32)>>,
     primitives: Primitives,
-    last_id: Id,
 }
 
 impl Default for Scene {
@@ -58,7 +57,8 @@ impl Default for Scene {
 impl Scene {
     pub fn new() -> Self {
         // let mut scene = Scene::new_empty();
-        let nn = rsnet_net_parser::extract_nn(include_str!("../../../rsnet_net_parser/src/test.py"));
+        let nn =
+            rsnet_net_parser::extract_nn(include_str!("../../../rsnet_net_parser/src/test.py"));
         let mut scene = scene_manager::gen_from_nn(nn.unwrap());
 
         let chunk_size = 10;
@@ -66,7 +66,7 @@ impl Scene {
 
         // Add 10M components to the scene
         let n_cols = 2;
-        let n_rows = 1;        
+        let n_rows = 1;
 
         // let n_cols = 1000;
         // let n_rows = 1000;
@@ -141,21 +141,16 @@ impl Scene {
     }
 
     pub fn new_empty() -> Self {
-
-        println!("{:#?}", DefaultComponentTypes::primitives());
         Scene {
             components: HashMap::new(),
             id_to_chunksize_chunk: HashMap::new(),
             wires_chunk_cache: HashMap::new(),
             wires: HashMap::new(),
             primitives: DefaultComponentTypes::primitives(),
-            last_id: 0,
         }
     }
 
-    pub fn primitives(
-        &self,
-    ) -> &Primitives {
+    pub fn primitives(&self) -> &Primitives {
         &self.primitives
     }
 

@@ -23,9 +23,10 @@ pub struct ComponentBufferEntry {
 
 impl ComponentBufferEntry {
     pub fn from_component(component: &Component) -> Self {
-        let model = Matrix3::new_translation(&component.position().xy().into())
-            * Matrix3::from_diagonal_element(component.scale())
-            * Matrix3::new_rotation(component.rotation());
+        let model = component.transform().clone();
+        // let model = Matrix3::new_translation(&component.position().xy().into())
+        //     * Matrix3::from_diagonal_element(component.scale())
+        //     * Matrix3::new_rotation(component.rotation());
 
         Self {
             id: component.id(),

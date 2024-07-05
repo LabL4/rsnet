@@ -89,7 +89,6 @@ pub fn parse_nn<'py>(nn_instance: Bound<'py, PyAny>) -> Result<Nn, NnParseError>
 }
 
 pub fn extract_nn(src: &str) -> Result<Nn, NnParseError> {
-
     pyo3::prepare_freethreaded_python();
 
     Python::with_gil(|py| {

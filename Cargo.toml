@@ -6,3 +6,4 @@ authors = ["Antonio Manuel Cantudo Gómez <cantudo@ugr.es>"]
 
 [workspace]
 members = ["./crates/*", "crates/rsnet_net_parser"]
+

@@ -77,7 +77,7 @@ impl Wire {
             next_direction,
 
             aabb: range,
-            circle_overlay: 0
+            circle_overlay: 0,
         }
     }
 
@@ -146,7 +146,7 @@ impl Wire {
                     wire_id: self.id,
                     start,
                     end,
-                    ty: 0,                      
+                    ty: 0,
                 },
             ));
         }

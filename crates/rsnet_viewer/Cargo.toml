@@ -38,7 +38,6 @@ egui = "0.26.2"
 tokio = { version = "1.34.0", features = ["rt-multi-thread"] }
 
 web-time = "0.2.3"
-nalgebra = "0.32.3"
 bytemuck = { version = "1.14.0", features = ["derive"] }
 encase = { version = "0.6.1", features = ["nalgebra"] }
 smaa = "0.13.0"
@@ -46,6 +45,11 @@ ttf-parser = "0.20.0"
 thiserror = "1.0.60"
 strum = "0.26.2"
 strum_macros = "0.26.2"
+
+nalgebra = "0.32.3"
+petgraph = "0.6.5"
+num = "0.4.3"
+
 
 
 # [target.'cfg(target_arch = "wasm32")'.dependencies]

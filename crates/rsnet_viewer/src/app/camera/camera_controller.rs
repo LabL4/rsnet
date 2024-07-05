@@ -271,17 +271,19 @@ impl CameraController {
 
                     let projection = self.camera.get_perspective();
 
-                    let start_ndc_point = Point3::new(0.0, 0.0, -1.0);
+                    let projected_z = projected_z(self.radius, &projection);
+
+                    let start_ndc_point = Point3::new(0.0, 0.0, projected_z);
                     let end_ndc_point = Point3::new(
                         (delta.x as f32 + width_half - width_half) / width_half,
                         (delta.y as f32 + height_half - height_half) / height_half,
-                        -1.0,
+                        projected_z,
                     );
 
                     let start_unproj = unproject_point(projection, &start_ndc_point);
                     let end_unproj = unproject_point(projection, &end_ndc_point);
 
-                    let diff = -(end_unproj - start_unproj) * self.radius;
+                    let diff = (end_unproj - start_unproj);
 
                     self.center =
                         self.center + camera_right.normalize() * (diff).x - camera_up * (diff).y;
@@ -373,15 +375,19 @@ impl CameraController {
             let width_half = self.window_size.width as f32 / 2.0;
             let height_half = self.window_size.height as f32 / 2.0;
 
+            let projected_z = projected_z(self.radius, &self.camera.get_perspective());
+
             let end_ndc_point = Point3::new(
                 (end_pos.x as f32 - width_half) / width_half,
                 (end_pos.y as f32 - height_half) / height_half,
-                -1.0,
+                // -1.0,
+                projected_z
             );
             let start_ndc_point = Point3::new(
                 (start_pos.x as f32 - width_half) / width_half,
                 (start_pos.y as f32 - height_half) / height_half,
-                -1.0,
+                // -1.0,
+                projected_z
             );
 
             let projection = self.camera.get_perspective();
@@ -389,19 +395,21 @@ impl CameraController {
             let start_unproj = unproject_point(projection, &start_ndc_point);
             let end_unproj = unproject_point(projection, &end_ndc_point);
 
-            let diff = -(end_unproj - start_unproj) * self.radius;
+            let diff = (end_unproj - start_unproj);
 
             let camera_right = self.camera.get_right_vector();
             let camera_up = self.camera.get_up_vector();
             // let camera_view_dir = self.camera.get_view_dir();
 
-            self.center = self.center + camera_right.normalize() * (diff).x - camera_up * (diff).y;
+            self.center = self.center + camera_right.normalize() * (diff).x - camera_up.normalize() * (diff).y;
 
             // println!("CENTER: {:#?}", self.center);
 
             self.update_view_matrix();
             // self.screen_world_aabb = get_ss_aabb(&self.camera.get_perspective(), self.radius, &self.center);
             // self.camera.set_aabb(self.screen_world_aabb.clone());
+
+            println!("view_matrix:\n {:.6}", self.camera.get_view_matrix());
 
             self.last_mouse_pos_translation = Some(mouse_pos);
         } else if !self.mouse_drag_state.right.is_dragging
@@ -471,7 +479,29 @@ fn check_button_drag(
 
 #[inline]
 #[must_use]
+pub fn projected_z<T: RealField>(radius: T, perspective: &Perspective3<T>) -> T {
+    let perspective = perspective.as_matrix();
+
+    let inverse_denom = -T::one() / radius.clone();
+    (perspective[(2, 2)].clone() * radius + perspective[(2, 3)].clone()) * inverse_denom
+}
+
+#[inline]
+#[must_use]
 pub fn unproject_point<T: RealField>(perspective: &Perspective3<T>, p: &Point3<T>) -> Point3<T> {
+    let perspective = perspective.as_matrix();
+    let inverse_denom = perspective[(2, 3)].clone() / (p[2].clone() + perspective[(2, 2)].clone());
+
+    Point3::new(
+        p[0].clone() * inverse_denom.clone() / perspective[(0, 0)].clone(),
+        p[1].clone() * inverse_denom.clone() / perspective[(1, 1)].clone(),
+        -inverse_denom,
+    )
+}
+
+#[inline]
+#[must_use]
+pub fn unproject_point2<T: RealField>(perspective: &Perspective3<T>, p: &Point3<T>) -> Point3<T> {
     let znear = perspective.znear();
     let perspective = perspective.as_matrix();
     let inverse_denom = perspective[(2, 3)].clone() / (p[2].clone() + perspective[(2, 2)].clone());
@@ -490,16 +520,27 @@ fn mouse_diff_from_radius(
     radius: f32,
     new_radius: f32,
 ) -> Vector2<f32> {
+    let p_z = projected_z(radius, perspective);
+
     let mouse_ndc = Point3::new(
         mouse_pos.x as f32 / window_size.width as f32 - 0.5,
         -(mouse_pos.y as f32 / window_size.height as f32 - 0.5),
-        0.0,
+        p_z,
     );
 
-    let start_unproj = unproject_point(&perspective, &mouse_ndc);
+    let p_z_new = projected_z(new_radius, perspective);
+    
+    let mouse_ndc_new_rad = Point3::new(
+        mouse_pos.x as f32 / window_size.width as f32 - 0.5,
+        -(mouse_pos.y as f32 / window_size.height as f32 - 0.5),
+        p_z_new
+    );
 
-    let start = start_unproj * radius;
-    let end = start_unproj * new_radius;
+
+    // let start_unproj = unproject_point(&perspective, &mouse_ndc);
+
+    let start = unproject_point(perspective, &mouse_ndc);
+    let end = unproject_point(perspective, &mouse_ndc_new_rad);
 
     let diff = start - end;
     Vector2::new(diff.x, diff.y)
@@ -508,8 +549,10 @@ fn mouse_diff_from_radius(
 /// Get screen space axis aligned bounding box
 #[inline]
 pub fn get_ss_aabb(perspective: &Perspective3<f32>, radius: f32, center: &Vector3<f32>) -> AaBb {
-    let min = unproject_point(perspective, &Point3::new(-0.5, -0.5, 0.0)) * radius + center;
-    let max = unproject_point(perspective, &Point3::new(0.5, 0.5, 0.0)) * radius + center;
+    let projected_z = projected_z(radius, perspective);
+
+    let min = unproject_point2(perspective, &Point3::new(-0.5, -0.5, 0.0)) * radius + center;
+    let max = unproject_point2(perspective, &Point3::new(0.5, 0.5, 0.0)) * radius + center;
 
     // println!("MIN: {:#?}, MAX: {:#?}", min, max);
 
